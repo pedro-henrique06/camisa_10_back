@@ -63,7 +63,8 @@ public static class ViewBuilder
             AttributeViews(s),
             s.Goals + s.SeasonGoals, s.Assists + s.SeasonAssists, s.SeasonGoals, s.SeasonAssists,
             warnings,
-            s.Status == CareerStatus.Active && engine.CanSearchClub());
+            s.Status == CareerStatus.Active && engine.CanSearchClub(),
+            Enumerable.Range(1, GameEngine.SeasonDays).Select(n => s.Competitions.FirstOrDefault(c => c.Days.Contains(n))?.Kind).ToList());
     }
 
     private static List<AttributeView> AttributeViews(Career s)
@@ -213,8 +214,7 @@ public static class ViewBuilder
             var played = c.Days.Count(d => d <= s.SeasonDay);
             return played >= c.Days.Count ? "Rodadas encerradas" : $"Rodada {played + 1} de {c.Days.Count}";
         }
-        var stage = GameEngine.StageName(c);
-        return c.Played < c.GroupGames ? $"{stage} · {c.Points} pts" : stage;
+        return c.Played < c.GroupGames ? $"Fase de grupos · {c.Points} pts" : GameEngine.StageName(c);
     }
 
     // ------------------------------------------------------------------ mercado

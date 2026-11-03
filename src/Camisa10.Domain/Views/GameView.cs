@@ -58,7 +58,9 @@ public record HudView(
     int SeasonGoals,
     int SeasonAssists,
     IReadOnlyList<string> Warnings,
-    bool CanSearchClub);
+    bool CanSearchClub,
+    /// <summary>Competição de cada dia da temporada (20 posições; nulo = sem jogo).</summary>
+    IReadOnlyList<string?> MatchDays);
 
 /// <summary>Barra da competição. Kind: league, state, cup, continental ou national (cor no app).</summary>
 public record CompetitionView(string Name, string Subtitle, string Kind);

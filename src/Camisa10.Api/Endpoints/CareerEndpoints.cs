@@ -82,7 +82,9 @@ public static partial class CareerEndpoints
     private static async Task<Results<Ok<GameView>, NotFound>> GetCareer(HttpContext http, string id, Camisa10DbContext db, CancellationToken ct)
     {
         var career = await Find(db, http, id, ct, tracking: false);
-        return career == null ? TypedResults.NotFound() : TypedResults.Ok(ViewBuilder.Build(career));
+        if (career == null) return TypedResults.NotFound();
+        new GameEngine(career).EnsureCalendar(); // só para a tela; é gravado na próxima ação
+        return TypedResults.Ok(ViewBuilder.Build(career));
     }
 
     private static async Task<Results<Ok<GameView>, NotFound, ProblemHttpResult, Conflict<GameView>>> Act(

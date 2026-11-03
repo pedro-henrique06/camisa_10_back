@@ -90,9 +90,20 @@ por acesso ou rebaixamento recente; para corrigir, edite a lista e regere:
   Campeão é quem termina em 1º. O balanço da temporada mostra a tabela com as zonas de acesso e rebaixamento.
 - **Propostas**: de clubes do mundo inteiro com o nível parecido, com mais chance para o próprio país, a mesma
   confederação, ligas fortes e clubes reais.
-- **Copas**: dependem da confederação, da divisão e do nível do clube (copa nacional, Liga dos Campeões,
-  Libertadores, Copa Sul-Americana…). Seleções: as 211, com Copa do Mundo a cada 4 temporadas e o torneio
-  continental de cada confederação nas outras.
+- **Calendário com copas intercaladas** (`GameEngine.Competitions.cs`): a temporada tem 20 dias e no
+  máximo um jogo por dia.
+
+  | Competição | Quem joga | Dias |
+  |---|---|---|
+  | Liga | todos | 5, 10, 15, 20 |
+  | Estadual (Paulistão, Carioca, Mineiro, Gauchão…) | clubes do Brasil | 1, 2, 4 (grupos), 6 e 8 (semi e final) |
+  | Copa nacional (Copa do Brasil, FA Cup, Copa do Rei…) | todo clube profissional | 11, 13, 16, 18 (oitavas a final) |
+  | Continental (Libertadores, Liga dos Campeões…) | alto da 1ª divisão na temporada anterior | 3, 7, 9 (grupos), 12, 14, 17, 19 |
+
+  A vaga continental sai da posição na liga anterior (no Brasil: 6 na Libertadores e 6 na Sul-Americana);
+  recém-promovidos ficam de fora. Eliminado, o resto da copa some do calendário. Lesionado, o time joga sem
+  você. Seleções: as 211, com Copa do Mundo a cada 4 temporadas e o torneio continental de cada confederação
+  nas outras, depois do dia 20.
 
 Carreiras criadas antes das ligas do mundo ganham semente e clube do mundo (pelo nome) na primeira ação.
 

@@ -24,8 +24,18 @@ public sealed partial class GameEngine
             if (byName == null && !s.Base && s.ClubId != null) s.Club = World.World.Club(s.ClubId)!.Name;
         }
         if (s.LeagueName == null) RefreshClub();
-        // carreiras salvas antes do calendário com copas
-        if (s.Competitions.Count == 0 && s.Season > 0) BuildCompetitions();
+        EnsureCalendar();
+    }
+
+    /// <summary>
+    /// Carreiras salvas antes do calendário com copas: monta as competições da temporada.
+    /// Não usa sorteio, então pode rodar também ao só abrir a carreira.
+    /// </summary>
+    public void EnsureCalendar()
+    {
+        if (s.Competitions.Count != 0 || s.Season <= 0 || s.Status != CareerStatus.Active) return;
+        if (s.LeagueName == null) RefreshClub();
+        BuildCompetitions();
     }
 
     private static int StableSeed(string text)
