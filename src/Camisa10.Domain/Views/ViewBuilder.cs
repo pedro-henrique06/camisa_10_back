@@ -95,7 +95,8 @@ public static class ViewBuilder
         return new EventView(
             ev.EventId, ev.Title, ev.Text, Competition(s, ev), routine, ev.Visual, ev.IsPenalty, options,
             ev.IsPenalty ? GameData.PenaltyZones.Select(z => z.Label).ToList() : null,
-            ev.IsPenalty ? s.Attributes.Chu : null);
+            ev.IsPenalty ? s.Attributes.Chu : null,
+            ev.IsPenalty ? new PowerRange(GameEngine.PenaltyPowerMin, GameEngine.PenaltyPowerMax) : null);
     }
 
     /// <summary>Barra da competição (compBar).</summary>
@@ -127,7 +128,7 @@ public static class ViewBuilder
             ? null
             : new DiceView(r.Dice.Attribute, GameData.AttributeNames[r.Dice.Attribute], r.Dice.Value, r.Dice.Modifier,
                 r.Dice.Difficulty, r.Dice.Roll, r.Dice.Roll + r.Dice.Modifier),
-        r.Chips, r.Anim);
+        r.Chips, r.Anim, r.Penalty);
 
     // ------------------------------------------------------------------ calendário (calScreen)
     private static int Offset(int n) => n < 1 ? -3 : (n - 1) / 5 * 28 + DayOffsets[(n - 1) % 5];

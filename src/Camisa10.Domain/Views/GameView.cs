@@ -73,11 +73,15 @@ public record EventView(
     bool IsPenalty,
     IReadOnlyList<OptionView> Options,
     IReadOnlyList<string>? PenaltyZones,
-    int? ShotSkill);
+    int? ShotSkill,
+    PowerRange? PenaltyPower);
+
+/// <summary>Faixa de força ideal da barra do pênalti.</summary>
+public record PowerRange(int IdealMin, int IdealMax);
 
 public record DiceView(string Attribute, string AttributeName, int Value, int Modifier, int Difficulty, int Roll, int Total);
 
-public record ResultView(string Title, string Chosen, string Text, bool Success, DiceView? Dice, IReadOnlyList<Chip> Chips, string? Anim);
+public record ResultView(string Title, string Chosen, string Text, bool Success, DiceView? Dice, IReadOnlyList<Chip> Chips, string? Anim, PenaltyShot? Penalty);
 
 public record CalendarCell(int Day, bool Done, bool Match, bool Window);
 
