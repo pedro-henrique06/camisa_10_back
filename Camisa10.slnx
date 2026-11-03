@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Camisa10.Api/Camisa10.Api.csproj" />
+    <Project Path="src/Camisa10.Domain/Camisa10.Domain.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Camisa10.Tests/Camisa10.Tests.csproj" />
+  </Folder>
+</Solution>
