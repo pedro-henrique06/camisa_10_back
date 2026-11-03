@@ -141,7 +141,8 @@ public sealed partial class GameEngine
         !s.Base && s.Age >= 19 && WindowOpen(s.SeasonDay) &&
         s.Phase is GamePhase.Calendar or GamePhase.Event or GamePhase.Result;
 
-    public static bool WindowOpen(int day) => day <= 4 || (day >= 11 && day <= 13);
+    /// <summary>Janela de transferências aberta na data (rodada) pedida.</summary>
+    public bool WindowOpen(int day) => SeasonCalendar.WindowOpen(s.CalendarType, Math.Max(1, day));
 
     // ------------------------------------------------------------------ fluxo principal (next)
     private void Next()
@@ -161,7 +162,7 @@ public sealed partial class GameEngine
             Next(); return;
         }
 
-        if (s.SeasonDay >= 20)
+        if (s.SeasonDay >= SeasonDays)
         {
             if (!s.NationalCupDone && !s.Base && s.Season % 2 == 0 && s.Age >= 19 && (s.Has("sel") || s.Overall >= 72))
             {
@@ -170,8 +171,6 @@ public sealed partial class GameEngine
                 StartCup(NationalCupName(), NationalStrength(), true);
                 return;
             }
-            var cn = ClubCupName();
-            if (cn != null && !s.Base && !s.CupDone) { s.CupDone = true; StartCup(cn, null, false); return; }
             if (!s.BallonCheckDone && !s.Base && s.Age >= 21 && s.Tier >= 3 && s.Overall >= 85 && s.Fame >= 60 && s.Titles >= 1)
             {
                 s.BallonCheckDone = true;
@@ -187,8 +186,8 @@ public sealed partial class GameEngine
         s.SeasonDay++;
         s.Day++;
 
-        // Janela de transferências: clubes fazem propostas nos dias 1 e 11.
-        if ((s.SeasonDay == 1 || s.SeasonDay == 11) && s.WindowDay != s.Day && !s.Base && s.Age >= 19 && Rand() < (s.Rumor ? .85 : .4))
+        // Janela de transferências: clubes fazem propostas no primeiro dia de cada janela.
+        if (SeasonCalendar.WindowStarts(s.CalendarType, s.SeasonDay) && s.WindowDay != s.Day && !s.Base && s.Age >= 19 && Rand() < (s.Rumor ? .85 : .4))
         {
             s.WindowDay = s.Day;
             s.Rumor = false;
@@ -198,7 +197,6 @@ public sealed partial class GameEngine
             Market("ev");
             return;
         }
-        if (s.SeasonDay == 8 && s.Season % 3 == 0 && s.Age >= 20) { Swap(); return; }
 
         GameEvent? personal = PickFromPool(id => GameData.Personal.Contains(id));
         GameEvent? training = PickFromPool(id => GameData.Training.Contains(id));
@@ -235,15 +233,27 @@ public sealed partial class GameEngine
 
         s.Queue = queue.Where(e => e != null).Select(e => e!).ToList();
 
-        // Dia de jogo: a cada 5 dias.
-        if (s.SeasonDay % 5 == 0 && s.Injury <= 0)
+        // Dia de jogo da liga, nas datas do calendário.
+        if (CompetitionOf("league") is { } leagueComp && leagueComp.Days.Contains(s.SeasonDay) && s.Injury <= 0)
         {
             var matchDay = new List<EventDef> { Events.Jogo };
             matchDay.AddRange(Events.MatchDay);
-            var plays = new List<GameEvent> { Pick(matchDay).ToEvent(true) };
+            var pre = Pick(matchDay).ToEvent(true);
+            pre.Focus = "pre";
+            var plays = new List<GameEvent> { pre };
             plays.AddRange(Moments());
-            foreach (var p in plays) p.IsMatch = true;
+            StartMatch("league", leagueComp.Name, plays);
             s.Queue.AddRange(plays);
+        }
+        // Estadual, copa nacional e continental nos dias marcados.
+        QueueCupGames();
+
+        // Proposta de mudança de posição: vem antes dos eventos do dia (que continuam na fila).
+        if (s.SeasonDay == 10 && s.Season % 3 == 0 && s.Age >= 20)
+        {
+            if (personal != null) s.Queue.Insert(0, personal);
+            Swap();
+            return;
         }
 
         GameEvent next;
@@ -276,6 +286,7 @@ public sealed partial class GameEngine
     /// <summary>Exibe um evento (show).</summary>
     private void Show(GameEvent ev)
     {
+        BeforeMoment(ev);
         s.Current = ev;
         if (ev.EventId != null) s.MarkUsed(ev.EventId);
         s.Phase = ev.IsPenalty ? GamePhase.Penalty : GamePhase.Event;
@@ -298,9 +309,13 @@ public sealed partial class GameEngine
         if (d.IsEmpty()) d.Morale = ok ? 1 : -1;
 
         _ctx = cur.Title + " " + o.Label + " " + text;
+        _cupTarget = cur.CompetitionId;
+        var live = MatchLive(cur);
         var before = Snapshot();
         var applied = Apply(d);
         _ctx = "";
+        _cupTarget = null;
+        AfterMoment(cur, ok, d);
         Trait(d, applied.SkillDelta, pr);
 
         if (ck != null) ck.Roll = roll;
@@ -312,7 +327,8 @@ public sealed partial class GameEngine
             Success = ok,
             Dice = ck,
             Chips = Chips(d, before, applied),
-            Anim = d.Anim
+            Anim = d.Anim,
+            Match = live
         };
         s.Current = null;
         s.Phase = GamePhase.Result;
@@ -436,9 +452,18 @@ public sealed partial class GameEngine
             s.Ballons++;
             s.Headlines.Add(s.Name + " é eleito o melhor do mundo");
         }
-        if (d.CupWin is > 0 && s.Cup != null) { if (s.Cup.Round < 0) s.Cup.Points += 3; s.Cup.Round++; }
-        if (d.CupDraw is > 0 && s.Cup != null) { s.Cup.Points += R(0, 1); s.Cup.Round++; }
-        if (d.CupLose is > 0 && s.Cup != null) s.Cup.On = false;
+        if (CompetitionOf(_cupTarget) is { } comp)
+        {
+            if (d.CupWin is > 0) CupOutcome(comp, 1);
+            else if (d.CupDraw is > 0) CupOutcome(comp, 0);
+            else if (d.CupLose is > 0) CupOutcome(comp, -1);
+        }
+        else
+        {
+            if (d.CupWin is > 0 && s.Cup != null) { if (s.Cup.Round < 0) s.Cup.Points += 3; s.Cup.Round++; }
+            if (d.CupDraw is > 0 && s.Cup != null) { s.Cup.Points += R(0, 1); s.Cup.Round++; }
+            if (d.CupLose is > 0 && s.Cup != null) s.Cup.On = false;
+        }
         if (d.NewClub != null)
         {
             var target = World.World.Club(d.NewClubId) ?? World.World.ClubByName(d.NewClub);
@@ -609,6 +634,7 @@ public sealed partial class GameEngine
         s.Club = s.BaseClub;
         s.ClubId = s.BaseClubId ?? s.ClubId;
         RefreshClub();
+        if (s.Season > 0) BuildCompetitions();
         s.Contract = 3;
         s.Salary = Math.Max(3, Round(SalaryFor(s.Tier) * .25));
     }
@@ -638,6 +664,7 @@ public sealed partial class GameEngine
         s.SeasonStartOverall = s.Overall;
         // acesso e rebaixamento da temporada anterior mudam a divisão (e o nível) do clube
         RefreshClub();
+        BuildCompetitions();
         s.CupDone = false;
         s.NationalCupDone = false;
         s.BallonCheckDone = false;
@@ -720,7 +747,8 @@ public sealed partial class GameEngine
             Rank = league?.Rank ?? 0,
             LeagueSize = league?.Size ?? 0,
             Movement = league?.Movement,
-            Table = league?.Table ?? new List<TableRow>()
+            Table = league?.Table ?? new List<TableRow>(),
+            Cups = CupResults()
         };
         s.Phase = GamePhase.SeasonSummary;
     }
@@ -863,9 +891,9 @@ public sealed partial class GameEngine
     /// <summary>Volta sem sair do clube (back).</summary>
     private void Back()
     {
+        var phase = s.ReturnPhase ?? GamePhase.Calendar;
         ClearMarket();
-        s.Phase = s.ReturnPhase ?? GamePhase.Calendar;
-        s.ReturnPhase = null;
+        s.Phase = phase;
     }
 
     private void ClearMarket()
@@ -925,9 +953,13 @@ public sealed partial class GameEngine
             : -(power - PenaltyPowerMax) / (100.0 - PenaltyPowerMax) * (high ? .45 : .2);
         var p = Clamp(basis + adj, .05, .95);
 
+        var shot = s.Current;
         s.Current = new GameEvent
         {
             Title = "Pênalti!",
+            IsMatch = shot?.IsMatch ?? false,
+            Minute = shot?.Minute,
+            Focus = "penalty",
             Options =
             {
                 new EventOption
@@ -1070,14 +1102,18 @@ public sealed partial class GameEngine
         var main = defender
             ? new List<EventDef> { Events.Def, Events.Def2, Events.Def3 }.Concat(Events.MatchDefense).Concat(Events.ExtraDefense).ToList()
             : new List<EventDef> { Events.Atk, Events.Atk2, Events.Atk3, Events.Atk4 }.Concat(Events.MatchAttack).Concat(Events.ExtraAttack).ToList();
-        list.Add(Pick(main).ToEvent(true));
+        var first = Pick(main).ToEvent(true);
+        first.Focus = defender ? "defense" : "attack";
+        list.Add(first);
         if (Rand() < .5)
         {
             var center = new List<EventDef> { Events.Cnr, Events.Cnr2 }.Concat(Events.MatchCenter).ToList();
-            list.Add(Pick(center).ToEvent(true));
+            var c = Pick(center).ToEvent(true);
+            c.Focus = "center";
+            list.Add(c);
         }
         if (!defender && Rand() < .25)
-            list.Add(new GameEvent { EventId = "pen", Title = "Pênalti!", Text = "O árbitro aponta a marca. A bola é sua. Onde bater?", IsPenalty = true, IsMatch = true });
+            list.Add(new GameEvent { EventId = "pen", Title = "Pênalti!", Text = "O árbitro aponta a marca. A bola é sua. Onde bater?", IsPenalty = true, IsMatch = true, Focus = "penalty" });
         return list;
     }
 }

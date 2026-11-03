@@ -58,9 +58,14 @@ public record HudView(
     int SeasonGoals,
     int SeasonAssists,
     IReadOnlyList<string> Warnings,
-    bool CanSearchClub);
+    bool CanSearchClub,
+    /// <summary>Competição de cada dia da temporada (20 posições; nulo = sem jogo).</summary>
+    IReadOnlyList<string?> MatchDays,
+    /// <summary>Data atual da temporada (ex.: "18 de janeiro"); nula antes da primeira.</summary>
+    string? Date);
 
-public record CompetitionView(string Name, string Subtitle);
+/// <summary>Barra da competição. Kind: league, state, cup, continental ou national (cor no app).</summary>
+public record CompetitionView(string Name, string Subtitle, string Kind);
 
 public record RoutineView(string Club, Badge ClubBadge, int Sessions, string Focus, string FocusName);
 
@@ -79,20 +84,45 @@ public record EventView(
     IReadOnlyList<OptionView> Options,
     IReadOnlyList<string>? PenaltyZones,
     int? ShotSkill,
-    PowerRange? PenaltyPower);
+    PowerRange? PenaltyPower,
+    /// <summary>Lance de partida: o campo com placar e narração até o lance.</summary>
+    MatchView? Match);
+
+/// <summary>
+/// Jogo ao vivo. For/Against são do time do jogador; o app mostra mandante à esquerda no placar.
+/// Focus diz onde está a bola no lance (pre, attack, defense, center, penalty, cup).
+/// </summary>
+public record MatchView(
+    string Team,
+    string Opponent,
+    Badge TeamBadge,
+    Badge OpponentBadge,
+    bool Home,
+    string Kind,
+    string Competition,
+    int StartFor,
+    int StartAgainst,
+    IReadOnlyList<MatchLine> Lines,
+    string Focus,
+    bool Final,
+    string Position);
 
 /// <summary>Faixa de força ideal da barra do pênalti.</summary>
 public record PowerRange(int IdealMin, int IdealMax);
 
 public record DiceView(string Attribute, string AttributeName, int Value, int Modifier, int Difficulty, int Roll, int Total);
 
-public record ResultView(string Title, string Chosen, string Text, bool Success, DiceView? Dice, IReadOnlyList<Chip> Chips, string? Anim, PenaltyShot? Penalty);
+public record ResultView(string Title, string Chosen, string Text, bool Success, DiceView? Dice, IReadOnlyList<Chip> Chips, string? Anim, PenaltyShot? Penalty, MatchView? Match);
 
-public record CalendarCell(int Day, bool Done, bool Match, bool Window);
+/// <summary>Dia do calendário. <see cref="Kind"/> é a competição do jogo do dia (league, state, cup, continental).</summary>
+public record CalendarCell(int Day, bool Done, bool Match, bool Window, string? Kind, string? Competition, int Month, int DayOfMonth, string MonthLabel);
 
-public record DateChip(int Offset, string Weekday, int Day, string Month, string Icon);
+/// <summary>Legenda do calendário: uma competição da temporada e como ela está.</summary>
+public record CompetitionLegend(string Kind, string Name, string Status, bool Out, bool Champion, int Games);
 
-public record AgendaItem(string Icon, string Title, string Detail);
+public record DateChip(int Offset, string Weekday, int Day, string Month, string Icon, string? Kind);
+
+public record AgendaItem(string Icon, string Title, string Detail, string? Kind = null);
 
 public record CalendarView(
     int DayDone,
@@ -102,7 +132,13 @@ public record CalendarView(
     IReadOnlyList<DateChip> Strip,
     int StripFrom,
     int StripTo,
-    IReadOnlyList<AgendaItem> Agenda);
+    IReadOnlyList<AgendaItem> Agenda,
+    IReadOnlyList<CompetitionLegend> Competitions,
+    /// <summary>Data da próxima rodada (ex.: "29 de março").</summary>
+    string NextDate,
+    int Total,
+    /// <summary>Ex.: "Temporada de janeiro a dezembro".</summary>
+    string SeasonSpan);
 
 public record OfferView(
     int Index,

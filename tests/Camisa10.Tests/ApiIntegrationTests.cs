@@ -105,6 +105,22 @@ public class ApiIntegrationTests : IDisposable
         Assert.Equal(HttpStatusCode.BadRequest, wrong.StatusCode);
     }
 
+    [MongoFact]
+    public async Task Carreira_salva_antes_das_copas_abre_com_o_calendario_completo()
+    {
+        var http = Client();
+        var created = await http.PostAsJsonAsync("/api/careers", new { name = "X", club = "Palmeiras", nation = "Brasil", position = "Meia" });
+        var view = (await created.Content.ReadFromJsonAsync<GameView>(Json))!;
+
+        // documento como era antes: sem a lista de competições
+        var careers = new MongoClient(MongoFactAttribute.Url).GetDatabase(_db).GetCollection<MongoDB.Bson.BsonDocument>("careers");
+        await careers.UpdateOneAsync(new MongoDB.Bson.BsonDocument("_id", view.Id), new MongoDB.Bson.BsonDocument("$unset", new MongoDB.Bson.BsonDocument("Competitions", "")));
+
+        var reloaded = await http.GetFromJsonAsync<GameView>($"/api/careers/{view.Id}", Json);
+        Assert.NotEmpty(reloaded!.Calendar!.Competitions);
+        Assert.Contains(reloaded.Calendar.Cells, c => c.Kind == "league");
+    }
+
     public void Dispose()
     {
         if (_factory == null) return;

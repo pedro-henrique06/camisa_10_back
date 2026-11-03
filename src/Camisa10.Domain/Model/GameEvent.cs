@@ -16,10 +16,19 @@ public class GameEvent
     public bool IsPenalty { get; set; }
     /// <summary>Ilustração: "trophy" ou "ball".</summary>
     public string? Visual { get; set; }
+    /// <summary>Jogo de copa: a competição (Kind em <see cref="Competition"/>) a que o jogo pertence.</summary>
+    public string? CompetitionId { get; set; }
+    /// <summary>Minuto do jogo em que o lance acontece (lances de partida).</summary>
+    public int? Minute { get; set; }
+    /// <summary>Tipo do lance para a animação do campo: pre, attack, defense, center, penalty, cup.</summary>
+    public string? Focus { get; set; }
 
     public GameEvent Clone() => new()
     {
         EventId = EventId,
+        CompetitionId = CompetitionId,
+        Minute = Minute,
+        Focus = Focus,
         Title = Title,
         Text = Text,
         IsMatch = IsMatch,

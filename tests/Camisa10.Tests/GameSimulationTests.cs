@@ -7,7 +7,7 @@ namespace Camisa10.Tests;
 public class GameSimulationTests
 {
     /// <summary>Joga uma carreira inteira escolhendo opções aleatórias.</summary>
-    internal static (Career Career, int Steps) PlayToEnd(int seed, string position = "Meia", string club = "Flamengo")
+    internal static (Career Career, int Steps) PlayToEnd(int seed, string position = "Meia", string club = "Flamengo", Action<Career>? onStep = null)
     {
         var rng = new GameRandom(seed);
         var picker = new Random(seed);
@@ -18,6 +18,7 @@ public class GameSimulationTests
         {
             Assert.True(++steps < 50_000, "carreira não terminou");
             var view = ViewBuilder.Build(career); // a view precisa ser montável em qualquer fase
+            onStep?.Invoke(career);
             if (view.Hud.CanSearchClub && picker.NextDouble() < .02)
             {
                 engine.Act(new GameAction(ActionType.SearchClub));
@@ -67,7 +68,8 @@ public class GameSimulationTests
             var (c, _) = PlayToEnd(seed * 7919, position, GameData.BaseClubs[seed % GameData.BaseClubs.Length].Club);
             Assert.Equal(GamePhase.Finished, c.Phase);
             Assert.NotNull(c.FinalTitle);
-            Assert.InRange(c.Age, 18, 38);
+            // quem para por lesão grave (ou escolhe a saúde) pode parar antes dos 18
+            Assert.InRange(c.Age, c.EndReason != null ? 15 : 18, 38);
             Assert.All(Attributes.Keys, k => Assert.InRange(c.Attributes[k], 1, 99));
             Assert.InRange(c.Overall, 0, 99);
             Assert.True(c.Money >= 0);
