@@ -30,6 +30,25 @@ Configuração (`appsettings.json` ou variáveis de ambiente):
 
 O documento OpenAPI fica em `/openapi/v1.json`.
 
+## Publicar no Railway
+
+O repositório já tem um `railway.json` (build pelo `Dockerfile` e healthcheck em `/health`), e a API escuta
+na porta da variável `PORT`, que o Railway define.
+
+1. No projeto do Railway, crie o banco: **+ Create → Database → MongoDB**.
+2. **+ Create → GitHub Repo →** `camisa_10_back`.
+3. Em **Variables** do backend:
+
+   | Variável | Valor |
+   | --- | --- |
+   | `ConnectionStrings__Mongo` | `${{MongoDB.MONGO_URL}}` (o nome entre chaves é o do serviço do banco) |
+   | `Mongo__Database` | `camisa10` |
+
+4. Em **Settings → Networking**, gere o domínio.
+
+`/health` mostra se o banco conectou (`"mongo": "conectado"`). Se o Mongo não responder, a API continua no
+ar, explica o erro nos **Deploy Logs** e tenta de novo sozinha.
+
 ## Estrutura
 
 ```
