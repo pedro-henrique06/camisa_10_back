@@ -1,0 +1,20 @@
+services:
+  mongo:
+    image: mongo:8
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+
+  api:
+    build: .
+    depends_on:
+      - mongo
+    environment:
+      ConnectionStrings__Mongo: mongodb://mongo:27017
+      Mongo__Database: camisa10
+    ports:
+      - "5080:8080"
+
+volumes:
+  mongo-data:
