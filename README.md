@@ -90,16 +90,21 @@ por acesso ou rebaixamento recente; para corrigir, edite a lista e regere:
   Campeão é quem termina em 1º. O balanço da temporada mostra a tabela com as zonas de acesso e rebaixamento.
 - **Propostas**: de clubes do mundo inteiro com o nível parecido, com mais chance para o próprio país, a mesma
   confederação, ligas fortes e clubes reais.
-- **Calendário com copas intercaladas** (`GameEngine.Competitions.cs`): a temporada tem 20 dias e no
-  máximo um jogo por dia.
+- **Temporada em datas do ano** (`SeasonCalendar.cs`, `GameEngine.Competitions.cs`): 24 datas por temporada,
+  no máximo um jogo por data. Dois calendários:
 
-  | Competição | Quem joga | Dias |
-  |---|---|---|
-  | Liga | todos | 5, 10, 15, 20 |
-  | Estadual (Paulistão, Carioca, Mineiro, Gauchão…) | clubes do Brasil | 1, 2, 4 (grupos), 6 e 8 (semi e final) |
-  | Copa nacional (Copa do Brasil, FA Cup, Copa do Rei…) | todo clube profissional | 11, 13, 16, 18 (oitavas a final) |
-  | Continental (Libertadores, Liga dos Campeões…) | alto da 1ª divisão na temporada anterior | 3, 7, 9 (grupos), 12, 14, 17, 19 |
+  | Calendário | Países | Período | Como se espalha |
+  |---|---|---|---|
+  | `ano` | América do Sul, EUA, Canadá, Japão, Coreia, China, nórdicos… | janeiro a dezembro | estadual jan–mar, liga mar–dez, copa nacional fev–nov, continental abr–nov; janelas jan–mar e julho |
+  | `europeu` | o resto | agosto a maio | liga o ano todo, continental set–mai, copa nacional out–mai; janelas agosto e janeiro |
 
+  Estadual (Paulistão, Carioca, Mineiro, Gauchão…) só no Brasil; sem ele, essas datas são rodadas da liga.
+  Copa nacional (Copa do Brasil, FA Cup, Copa do Rei…): 5 fases, da terceira fase à final. Continental
+  (Libertadores, Liga dos Campeões…): 3 jogos de grupo e mata-mata das oitavas à final.
+- **Jogo ao vivo** (`GameEngine.Match.cs`): cada jogo tem adversário da competição, mando, placar e narração
+  minuto a minuto. Entre as decisões do jogador, o jogo é simulado pela força dos times; a decisão muda o
+  placar (gol, assistência, defesa, pênalti) e, na copa, define o resultado. O app mostra o campo com os
+  jogadores correndo atrás da bola e a barra de narração.
   A vaga continental sai da posição na liga anterior (no Brasil: 6 na Libertadores e 6 na Sul-Americana);
   recém-promovidos ficam de fora. Eliminado, o resto da copa some do calendário. Lesionado, o time joga sem
   você. Seleções: as 211, com Copa do Mundo a cada 4 temporadas e o torneio continental de cada confederação
