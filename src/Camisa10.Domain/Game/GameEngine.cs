@@ -141,7 +141,8 @@ public sealed partial class GameEngine
         !s.Base && s.Age >= 19 && WindowOpen(s.SeasonDay) &&
         s.Phase is GamePhase.Calendar or GamePhase.Event or GamePhase.Result;
 
-    public static bool WindowOpen(int day) => day <= 4 || (day >= 11 && day <= 13);
+    /// <summary>Janela de transferências aberta na data (rodada) pedida.</summary>
+    public bool WindowOpen(int day) => SeasonCalendar.WindowOpen(s.CalendarType, Math.Max(1, day));
 
     // ------------------------------------------------------------------ fluxo principal (next)
     private void Next()
@@ -185,8 +186,8 @@ public sealed partial class GameEngine
         s.SeasonDay++;
         s.Day++;
 
-        // Janela de transferências: clubes fazem propostas nos dias 1 e 11.
-        if ((s.SeasonDay == 1 || s.SeasonDay == 11) && s.WindowDay != s.Day && !s.Base && s.Age >= 19 && Rand() < (s.Rumor ? .85 : .4))
+        // Janela de transferências: clubes fazem propostas no primeiro dia de cada janela.
+        if (SeasonCalendar.WindowStarts(s.CalendarType, s.SeasonDay) && s.WindowDay != s.Day && !s.Base && s.Age >= 19 && Rand() < (s.Rumor ? .85 : .4))
         {
             s.WindowDay = s.Day;
             s.Rumor = false;
@@ -196,7 +197,6 @@ public sealed partial class GameEngine
             Market("ev");
             return;
         }
-        if (s.SeasonDay == 8 && s.Season % 3 == 0 && s.Age >= 20) { s.Queue.Clear(); QueueCupGames(); Swap(); return; }
 
         GameEvent? personal = PickFromPool(id => GameData.Personal.Contains(id));
         GameEvent? training = PickFromPool(id => GameData.Training.Contains(id));
@@ -233,18 +233,28 @@ public sealed partial class GameEngine
 
         s.Queue = queue.Where(e => e != null).Select(e => e!).ToList();
 
-        // Dia de jogo: a cada 5 dias.
-        if (s.SeasonDay % 5 == 0 && s.Injury <= 0)
+        // Dia de jogo da liga, nas datas do calendário.
+        if (CompetitionOf("league") is { } leagueComp && leagueComp.Days.Contains(s.SeasonDay) && s.Injury <= 0)
         {
             var matchDay = new List<EventDef> { Events.Jogo };
             matchDay.AddRange(Events.MatchDay);
-            var plays = new List<GameEvent> { Pick(matchDay).ToEvent(true) };
+            var pre = Pick(matchDay).ToEvent(true);
+            pre.Focus = "pre";
+            var plays = new List<GameEvent> { pre };
             plays.AddRange(Moments());
-            foreach (var p in plays) p.IsMatch = true;
+            StartMatch("league", leagueComp.Name, plays);
             s.Queue.AddRange(plays);
         }
         // Estadual, copa nacional e continental nos dias marcados.
         QueueCupGames();
+
+        // Proposta de mudança de posição: vem antes dos eventos do dia (que continuam na fila).
+        if (s.SeasonDay == 10 && s.Season % 3 == 0 && s.Age >= 20)
+        {
+            if (personal != null) s.Queue.Insert(0, personal);
+            Swap();
+            return;
+        }
 
         GameEvent next;
         if (personal != null) next = personal;
@@ -276,6 +286,7 @@ public sealed partial class GameEngine
     /// <summary>Exibe um evento (show).</summary>
     private void Show(GameEvent ev)
     {
+        BeforeMoment(ev);
         s.Current = ev;
         if (ev.EventId != null) s.MarkUsed(ev.EventId);
         s.Phase = ev.IsPenalty ? GamePhase.Penalty : GamePhase.Event;
@@ -299,10 +310,12 @@ public sealed partial class GameEngine
 
         _ctx = cur.Title + " " + o.Label + " " + text;
         _cupTarget = cur.CompetitionId;
+        var live = MatchLive(cur);
         var before = Snapshot();
         var applied = Apply(d);
         _ctx = "";
         _cupTarget = null;
+        AfterMoment(cur, ok, d);
         Trait(d, applied.SkillDelta, pr);
 
         if (ck != null) ck.Roll = roll;
@@ -314,7 +327,8 @@ public sealed partial class GameEngine
             Success = ok,
             Dice = ck,
             Chips = Chips(d, before, applied),
-            Anim = d.Anim
+            Anim = d.Anim,
+            Match = live
         };
         s.Current = null;
         s.Phase = GamePhase.Result;
@@ -939,9 +953,13 @@ public sealed partial class GameEngine
             : -(power - PenaltyPowerMax) / (100.0 - PenaltyPowerMax) * (high ? .45 : .2);
         var p = Clamp(basis + adj, .05, .95);
 
+        var shot = s.Current;
         s.Current = new GameEvent
         {
             Title = "Pênalti!",
+            IsMatch = shot?.IsMatch ?? false,
+            Minute = shot?.Minute,
+            Focus = "penalty",
             Options =
             {
                 new EventOption
@@ -1084,14 +1102,18 @@ public sealed partial class GameEngine
         var main = defender
             ? new List<EventDef> { Events.Def, Events.Def2, Events.Def3 }.Concat(Events.MatchDefense).Concat(Events.ExtraDefense).ToList()
             : new List<EventDef> { Events.Atk, Events.Atk2, Events.Atk3, Events.Atk4 }.Concat(Events.MatchAttack).Concat(Events.ExtraAttack).ToList();
-        list.Add(Pick(main).ToEvent(true));
+        var first = Pick(main).ToEvent(true);
+        first.Focus = defender ? "defense" : "attack";
+        list.Add(first);
         if (Rand() < .5)
         {
             var center = new List<EventDef> { Events.Cnr, Events.Cnr2 }.Concat(Events.MatchCenter).ToList();
-            list.Add(Pick(center).ToEvent(true));
+            var c = Pick(center).ToEvent(true);
+            c.Focus = "center";
+            list.Add(c);
         }
         if (!defender && Rand() < .25)
-            list.Add(new GameEvent { EventId = "pen", Title = "Pênalti!", Text = "O árbitro aponta a marca. A bola é sua. Onde bater?", IsPenalty = true, IsMatch = true });
+            list.Add(new GameEvent { EventId = "pen", Title = "Pênalti!", Text = "O árbitro aponta a marca. A bola é sua. Onde bater?", IsPenalty = true, IsMatch = true, Focus = "penalty" });
         return list;
     }
 }

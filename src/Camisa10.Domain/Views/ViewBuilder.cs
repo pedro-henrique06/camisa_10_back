@@ -9,8 +9,6 @@ public static class ViewBuilder
 {
     private static readonly string[] Weekdays = { "dom", "seg", "ter", "qua", "qui", "sex", "sáb" };
     private static readonly string[] Months = { "jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez" };
-    private static readonly int[] DayOffsets = { 0, 4, 10, 17, 27 };
-    private static readonly DateTime SeasonStart = new(2026, 8, 3);
 
     public static GameView Build(Career s)
     {
@@ -22,7 +20,7 @@ public static class ViewBuilder
             s.Status.ToString(),
             Hud(s, engine),
             s.Phase is GamePhase.Event or GamePhase.Penalty && s.Current != null ? Event(s, engine, s.Current) : null,
-            s.Phase == GamePhase.Result && s.LastResult != null ? Result(s.LastResult) : null,
+            s.Phase == GamePhase.Result && s.LastResult != null ? Result(s, s.LastResult) : null,
             s.Phase == GamePhase.Calendar ? Calendar(s, engine) : null,
             s.Phase == GamePhase.Market ? Market(s) : null,
             s.Phase == GamePhase.Swap ? new SwapView(s.Position, s.SwapTarget ?? s.Position) : null,
@@ -37,7 +35,7 @@ public static class ViewBuilder
     // ------------------------------------------------------------------ HUD
     private static HudView Hud(Career s, GameEngine engine)
     {
-        var window = !s.Base && GameEngine.WindowOpen(s.SeasonDay);
+        var window = !s.Base && engine.WindowOpen(s.SeasonDay);
         var line = s.Club +
                    (s.Base ? " · Sub-" + (s.Age <= 15 ? 15 : s.Age <= 17 ? 17 : 20) : (s.LeagueName != null ? " · " + s.LeagueName : "") + " · contrato " + s.Contract + "a") +
                    (window ? " · janela aberta" : "") +
@@ -64,7 +62,8 @@ public static class ViewBuilder
             s.Goals + s.SeasonGoals, s.Assists + s.SeasonAssists, s.SeasonGoals, s.SeasonAssists,
             warnings,
             s.Status == CareerStatus.Active && engine.CanSearchClub(),
-            Enumerable.Range(1, GameEngine.SeasonDays).Select(n => s.Competitions.FirstOrDefault(c => c.Days.Contains(n))?.Kind).ToList());
+            Enumerable.Range(1, GameEngine.SeasonDays).Select(n => s.Competitions.FirstOrDefault(c => c.Days.Contains(n))?.Kind).ToList(),
+            s.SeasonDay >= 1 ? SeasonCalendar.Label(SeasonCalendar.At(s.CalendarType, s.SeasonDay)) : null);
     }
 
     private static List<AttributeView> AttributeViews(Career s)
@@ -102,19 +101,20 @@ public static class ViewBuilder
             ev.EventId, ev.Title, ev.Text, Competition(s, ev), routine, ev.Visual, ev.IsPenalty, options,
             ev.IsPenalty ? GameData.PenaltyZones.Select(z => z.Label).ToList() : null,
             ev.IsPenalty ? s.Attributes.Chu : null,
-            ev.IsPenalty ? new PowerRange(GameEngine.PenaltyPowerMin, GameEngine.PenaltyPowerMax) : null);
+            ev.IsPenalty ? new PowerRange(GameEngine.PenaltyPowerMin, GameEngine.PenaltyPowerMax) : null,
+            ev.IsMatch && ev.Minute != null && s.Match is { } m && m.Turn == s.SeasonDay ? Match(s, m.EventMark, ev.Focus ?? "attack") : null);
     }
 
     /// <summary>Barra da competição (compBar).</summary>
     private static CompetitionView? Competition(Career s, GameEvent ev)
     {
+        if (ev.CompetitionId != null && s.Competitions.FirstOrDefault(c => c.Kind == ev.CompetitionId) is { } comp)
+            return new CompetitionView(comp.Name, GameEngine.StageName(comp), comp.Kind);
         if (ev.IsMatch)
         {
             var (name, sub) = League(s);
             return new CompetitionView(name, sub, "league");
         }
-        if (ev.CompetitionId != null && s.Competitions.FirstOrDefault(c => c.Kind == ev.CompetitionId) is { } comp)
-            return new CompetitionView(comp.Name, GameEngine.StageName(comp), comp.Kind);
         if (s.Cup != null && GameEngine.IsCupEvent(ev))
             return new CompetitionView(s.Cup.Name, s.Cup.National ? "Seleção " + s.Nation : "Torneio", s.Cup.National ? "national" : "cup");
         return null;
@@ -125,41 +125,55 @@ public static class ViewBuilder
     {
         if (s.Base) return ("Campeonato de Base", "Categoria sub-" + (s.Age <= 16 ? 17 : 20));
         var c = GameEngine.CountryOfId(s.ClubId)?.Name ?? GameEngine.CountryOf(s.Club) ?? "";
-        var day = s.SeasonDay == 0 ? 5 : s.SeasonDay;
-        return (s.LeagueName ?? "Campeonato nacional", $"{c} · jogo {(int)Math.Ceiling(day / 5.0)} de 4");
+        var days = s.Competitions.FirstOrDefault(x => x.Kind == "league")?.Days ?? new List<int>();
+        var round = days.Count(d => d < Math.Max(1, s.SeasonDay)) + 1;
+        if (days.Contains(s.SeasonDay)) round = days.IndexOf(s.SeasonDay) + 1;
+        return (s.LeagueName ?? "Campeonato nacional", $"{c} · rodada {Math.Min(round, Math.Max(1, days.Count))} de {days.Count}");
     }
 
     // ------------------------------------------------------------------ resultado
-    private static ResultView Result(PickResult r) => new(
+    private static ResultView Result(Career s, PickResult r) => new(
         r.Title, r.Chosen, r.Text, r.Success,
         r.Dice == null
             ? null
             : new DiceView(r.Dice.Attribute, GameData.AttributeNames[r.Dice.Attribute], r.Dice.Value, r.Dice.Modifier,
                 r.Dice.Difficulty, r.Dice.Roll, r.Dice.Roll + r.Dice.Modifier),
-        r.Chips, r.Anim, r.Penalty);
+        r.Chips, r.Anim, r.Penalty,
+        r.Match && s.Match != null ? Match(s, s.Match.ResultMark, "result") : null);
+
+    /// <summary>Trecho do jogo a partir de <paramref name="mark"/> no feed.</summary>
+    private static MatchView Match(Career s, int mark, string focus)
+    {
+        var m = s.Match!;
+        mark = Math.Clamp(mark, 0, m.Feed.Count);
+        var start = mark > 0 ? m.Feed[mark - 1] : null;
+        var team = s.Base ? GameEngine.CleanClub(s.Club) + " sub-20" : s.Club;
+        return new MatchView(team, m.Opponent, BadgeFor(s.Club), BadgeFor(m.Opponent.Replace(" sub-20", "")), m.Home, m.Kind, m.Competition,
+            start?.For ?? 0, start?.Against ?? 0, m.Feed.Skip(mark).ToList(), focus, m.Final, s.Position);
+    }
 
     // ------------------------------------------------------------------ calendário (calScreen)
-    private static int Offset(int n) => n < 1 ? -3 : (n - 1) / 5 * 28 + DayOffsets[(n - 1) % 5];
-
     private static CalendarView Calendar(Career s, GameEngine engine)
     {
         int a = s.SeasonDay, b = s.SeasonDay + 1;
+        var cal = s.CalendarType;
         Competition? MatchOn(int n) => s.Competitions.FirstOrDefault(c => c.Days.Contains(n));
         bool IsMatch(int n) => MatchOn(n) != null;
-        bool IsWindow(int n) => !s.Base && s.Age >= 19 && GameEngine.WindowOpen(n);
+        bool IsWindow(int n) => !s.Base && s.Age >= 19 && engine.WindowOpen(n);
 
         var cells = Enumerable.Range(1, GameEngine.SeasonDays).Select(n =>
         {
             var c = MatchOn(n);
-            return new CalendarCell(n, n <= a, c != null, IsWindow(n), c?.Kind, c?.Name);
+            var d = SeasonCalendar.At(cal, n);
+            return new CalendarCell(n, n <= a, c != null, IsWindow(n), c?.Kind, c?.Name, d.Month, d.Day, SeasonCalendar.ShortMonth(d.Month));
         }).ToList();
 
         var routine = engine.Routine();
         var (league, leagueSub) = League(s);
         var agenda = new List<AgendaItem>
         {
-            new("☀", "Manhã", s.Injury > 0
-                ? $"Recuperação e fisioterapia ({s.Injury} dia{(s.Injury > 1 ? "s" : "")} de lesão)"
+            new("☀", "Semana de treinos", s.Injury > 0
+                ? $"Recuperação e fisioterapia ({s.Injury} rodada{(s.Injury > 1 ? "s" : "")} de lesão)"
                 : (routine.Sessions == 2 ? "Treino em dois períodos (manhã e tarde)" : "Treino em período único") + " · foco do clube: " + routine.FocusName),
             new("🏠", "Vida pessoal", "Uma decisão fora de campo")
         };
@@ -174,34 +188,36 @@ public static class ViewBuilder
             var nextDay = Enumerable.Range(b + 1, Math.Max(0, GameEngine.SeasonDays - b)).FirstOrDefault(IsMatch);
             if (nextDay > 0)
             {
-                var nm = nextDay - b;
                 var c = MatchOn(nextDay)!;
-                agenda.Add(new("📅", "Próximo jogo", $"em {nm} dia{(nm > 1 ? "s" : "")} (dia {nextDay}) · {c.Name}", c.Kind));
+                agenda.Add(new("📅", "Próximo jogo", $"{SeasonCalendar.Label(SeasonCalendar.At(cal, nextDay))} · {c.Name}", c.Kind));
             }
         }
         if (IsWindow(b)) agenda.Add(new("🔁", "Mercado", "Janela de transferências aberta"));
         if (!s.Base && s.Contract <= 1)
             agenda.Add(new("✍", "Contrato", "Vence em " + (s.Contract < 1 ? "menos de 1 ano" : "1 ano") + ", renovar ou procurar clube"));
-        if (b == GameEngine.SeasonDays) agenda.Add(new("🏁", "Fim da temporada", "Depois do dia 20: seleção, prêmios e balanço"));
+        if (b == GameEngine.SeasonDays) agenda.Add(new("🏁", "Fim da temporada", "Depois desta data: seleção, prêmios e balanço"));
 
-        int o0 = Offset(a), o1 = Offset(b);
-        var icons = new Dictionary<int, string>();
-        for (var n = Math.Max(1, a); n <= b; n++)
-            icons[Offset(n)] = MatchOn(n) is { } m ? (m.Kind == "league" ? "⚽" : "🏆") : IsWindow(n) ? "🔁" : "";
+        // Fita: a data anterior, a concluída, a próxima e duas depois.
         var strip = new List<DateChip>();
-        for (var o = o0 - 1; o <= o1 + 2; o++)
+        for (var n = a - 1; n <= b + 2; n++)
         {
-            var d = SeasonStart.AddDays(o);
-            strip.Add(new DateChip(o, Weekdays[(int)d.DayOfWeek], d.Day, Months[d.Month - 1], icons.GetValueOrDefault(o, "")));
+            var d = SeasonCalendar.Date(cal, n);
+            var icon = n >= 1 && n <= GameEngine.SeasonDays ? MatchOn(n) is { } m ? (m.Kind == "league" ? "⚽" : "🏆") : IsWindow(n) ? "🔁" : "" : "";
+            strip.Add(new DateChip(n, Weekdays[(int)d.DayOfWeek], d.Day, Months[d.Month - 1], icon, n >= 1 && n <= GameEngine.SeasonDays ? MatchOn(n)?.Kind : null));
         }
 
         var legend = s.Competitions.Select(c => new CompetitionLegend(c.Kind, c.Name, LegendStatus(s, c), c.Out, c.Champion, c.Days.Count)).ToList();
         var games = s.Competitions.Sum(c => c.Days.Count);
         var names = s.Competitions.Select(c => c.Name).ToList();
         var list = names.Count <= 1 ? names.FirstOrDefault() ?? "" : string.Join(", ", names.Take(names.Count - 1)) + " e " + names[^1];
+        var next = SeasonCalendar.At(cal, b);
+        var first = SeasonCalendar.At(cal, 1);
+        var last = SeasonCalendar.At(cal, GameEngine.SeasonDays);
         return new CalendarView(a, b,
-            (a > 0 ? $"Dia {a} concluído. " : "Início da temporada. ") + $"{games} jogos: {list}.",
-            cells, strip, 1, strip.Count - 3, agenda, legend);
+            (a > 0 ? $"{SeasonCalendar.Label(SeasonCalendar.At(cal, a))} concluído. " : "Início da temporada. ") + $"{games} jogos: {list}.",
+            cells, strip, 1, strip.Count - 3, agenda, legend,
+            SeasonCalendar.Label(next), GameEngine.SeasonDays,
+            $"Temporada de {SeasonCalendar.MonthNames[first.Month - 1]} a {SeasonCalendar.MonthNames[last.Month - 1]}");
     }
 
     /// <summary>Como a competição está para a legenda do calendário.</summary>

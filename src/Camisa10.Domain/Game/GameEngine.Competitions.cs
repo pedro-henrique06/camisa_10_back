@@ -5,20 +5,15 @@ using static Camisa10.Domain.Game.Num;
 namespace Camisa10.Domain.Game;
 
 /// <summary>
-/// Calendário da temporada: liga, estadual (Brasil), copa nacional e copa continental,
-/// com jogos intercalados ao longo dos 20 dias.
+/// Competições da temporada: liga, estadual (Brasil), copa nacional e copa continental, com os jogos
+/// espalhados pelas datas do ano (ver <see cref="SeasonCalendar"/>).
 /// </summary>
 public sealed partial class GameEngine
 {
-    public const int SeasonDays = 20;
+    /// <summary>Datas (rodadas) de uma temporada.</summary>
+    public static int SeasonDays => SeasonCalendar.Length;
 
-    // Dias de jogo de cada competição. Não se repetem: no máximo um jogo por dia.
-    private static readonly int[] LeagueDays = { 5, 10, 15, 20 };
-    private static readonly int[] StateDays = { 1, 2, 4, 6, 8 };          // 3 de grupo + semifinal e final
-    private static readonly int[] ContinentalDays = { 3, 7, 9, 12, 14, 17, 19 }; // 3 de grupo + oitavas a final
-    private static readonly int[] CupDays = { 11, 13, 16, 18 };          // oitavas a final
-
-    private static readonly string[] KnockoutStages = { "Oitavas", "Quartas", "Semifinal", "Final" };
+    private static readonly string[] KnockoutStages = { "Primeira fase", "Segunda fase", "Terceira fase", "Oitavas", "Quartas", "Semifinal", "Final" };
 
     /// <summary>Competição do jogo de copa que está sendo decidido (para aplicar vitória ou derrota).</summary>
     private string? _cupTarget;
@@ -30,18 +25,29 @@ public sealed partial class GameEngine
     private void BuildCompetitions()
     {
         s.Queue.RemoveAll(e => e.CompetitionId != null);
+        var country = s.Base ? null : CountryOfId(s.ClubId);
+        // O calendário (ano ou europeu) é do clube no começo da temporada; quem troca de clube no meio
+        // segue as datas da temporada em andamento.
+        if (s.SeasonDay == 0 || s.CalendarType == null)
+            s.CalendarType = SeasonCalendar.ForCountry(CountryOfId(s.ClubId ?? s.BaseClubId));
+        var cal = s.CalendarType;
+        var state = country != null ? StateChampionshipName() : null;
+
         var list = new List<Competition>
         {
-            new() { Kind = "league", Name = s.Base ? "Campeonato de Base" : s.LeagueName ?? "Campeonato nacional", Days = LeagueDays.ToList() }
+            new()
+            {
+                Kind = "league", Name = s.Base ? "Campeonato de Base" : s.LeagueName ?? "Campeonato nacional",
+                Days = SeasonCalendar.DaysOf(cal, "league", hasState: s.Base || state != null)
+            }
         };
-        var country = s.Base ? null : CountryOfId(s.ClubId);
         if (country != null)
         {
-            if (StateChampionshipName() is { } state)
-                list.Add(new Competition { Kind = "state", Name = state, Days = StateDays.ToList(), GroupGames = 3, Bonus = s.Division == 0 ? .04 : 0 });
-            list.Add(new Competition { Kind = "cup", Name = DomesticCupName(country), Days = CupDays.ToList() });
+            if (state != null)
+                list.Add(new Competition { Kind = "state", Name = state, Days = SeasonCalendar.DaysOf(cal, "state", true), GroupGames = 3, Bonus = s.Division == 0 ? .04 : 0 });
+            list.Add(new Competition { Kind = "cup", Name = DomesticCupName(country), Days = SeasonCalendar.DaysOf(cal, "cup", true) });
             if (ContinentalCupName() is { } cont)
-                list.Add(new Competition { Kind = "continental", Name = cont, Days = ContinentalDays.ToList(), GroupGames = 3, Bonus = -.06 });
+                list.Add(new Competition { Kind = "continental", Name = cont, Days = SeasonCalendar.DaysOf(cal, "continental", true), GroupGames = 3, Bonus = -.06 });
         }
 
         foreach (var c in list.Where(c => c.Kind != "league").ToList())
@@ -70,7 +76,12 @@ public sealed partial class GameEngine
                 var win = Rand() < CupChance(c) - .05;
                 CupOutcome(c, win ? 1 : c.Played < c.GroupGames ? 0 : -1, true);
             }
-            else s.Queue.Add(CupGame(c));
+            else
+            {
+                var game = CupGame(c);
+                StartMatch(c.Kind, c.Name, new List<GameEvent> { game });
+                s.Queue.Add(game);
+            }
         }
     }
 
@@ -97,6 +108,7 @@ public sealed partial class GameEngine
         {
             EventId = (group ? "cg" : "cup") + c.Played,
             CompetitionId = c.Kind,
+            Focus = "cup",
             Title = c.Name + " · " + stage,
             Text = group ? $"{c.GroupGames} jogos valem a vaga no mata-mata."
                 : stage == "Final" ? "A final. Quem vencer leva a taça."

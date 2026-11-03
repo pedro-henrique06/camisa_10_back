@@ -41,12 +41,50 @@ public class CompetitionTests
         Assert.All(days, d => Assert.InRange(d, 1, GameEngine.SeasonDays));
         // a Libertadores é intercalada com o resto (não fica toda no fim)
         var lib = s.Competitions[3].Days;
-        Assert.True(lib.Min() < 5 && lib.Max() > 15);
+        Assert.True(lib.Min() < 10 && lib.Max() > 20);
 
         var cal = ViewBuilder.Build(s).Calendar!;
         Assert.Equal(4, cal.Competitions.Count);
         Assert.Contains(cal.Cells, c => c.Kind == "continental");
         Assert.Contains(cal.Cells, c => c.Kind == "state");
+    }
+
+    [Fact]
+    public void No_brasil_a_temporada_vai_de_janeiro_a_dezembro_e_o_estadual_e_no_comeco()
+    {
+        var (s, _) = Pro("Palmeiras");
+        Assert.Equal(SeasonCalendar.Year, s.CalendarType);
+        int Month(int turn) => SeasonCalendar.At(s.CalendarType, turn).Month;
+        var comp = s.Competitions.ToDictionary(c => c.Kind);
+        Assert.All(comp["state"].Days, d => Assert.InRange(Month(d), 1, 3));
+        Assert.InRange(Month(comp["league"].Days[0]), 3, 4);
+        Assert.Equal(12, Month(comp["league"].Days[^1]));
+        Assert.Equal(11, Month(comp["continental"].Days[^1]));   // final da Libertadores em novembro
+        // nenhuma competição fica toda dentro de um mês só
+        Assert.All(comp.Values, c => Assert.True(Month(c.Days[^1]) - Month(c.Days[0]) >= 2, c.Name));
+        var cal = ViewBuilder.Build(s).Calendar!;
+        Assert.Equal("Temporada de janeiro a dezembro", cal.SeasonSpan);
+        Assert.Equal("18 de janeiro", cal.NextDate);
+    }
+
+    [Fact]
+    public void Na_europa_a_temporada_vai_de_agosto_a_maio()
+    {
+        var (s, _) = Pro("Real Madrid");
+        Assert.Equal(SeasonCalendar.European, s.CalendarType);
+        var league = s.Competitions.Single(c => c.Kind == "league").Days;
+        Assert.Equal(8, SeasonCalendar.At(s.CalendarType, league[0]).Month);
+        Assert.Equal(5, SeasonCalendar.At(s.CalendarType, league[^1]).Month);
+        Assert.Equal(12, league.Count); // sem estadual, mais rodadas da liga
+    }
+
+    [Fact]
+    public void Argentina_sem_estadual_tem_mais_rodadas_da_liga()
+    {
+        var (s, _) = Pro("Boca Juniors");
+        Assert.Equal(SeasonCalendar.Year, s.CalendarType);
+        Assert.DoesNotContain(s.Competitions, c => c.Kind == "state");
+        Assert.Equal(12, s.Competitions.Single(c => c.Kind == "league").Days.Count);
     }
 
     [Theory]
@@ -88,7 +126,6 @@ public class CompetitionTests
                 if (s.Phase != GamePhase.Event || s.Current?.CompetitionId is not { } kind) return;
                 var comp = s.Competitions.Single(c => c.Kind == kind);
                 Assert.Contains(s.SeasonDay, comp.Days);
-                Assert.True(s.SeasonDay < GameEngine.SeasonDays);
                 if (seen.LastOrDefault() != (s.Season, s.SeasonDay, kind)) seen.Add((s.Season, s.SeasonDay, kind));
             });
         }
@@ -96,7 +133,7 @@ public class CompetitionTests
         Assert.Contains(seen, x => x.Kind == "cup");
         Assert.Contains(seen, x => x.Kind == "continental");
         // copas não ficam mais todas depois do dia 20
-        Assert.Contains(seen, x => x.Kind == "continental" && x.Day < 10);
+        Assert.Contains(seen, x => x.Kind == "continental" && x.Day < 12);
     }
 
     [Fact]
@@ -136,9 +173,10 @@ public class CompetitionTests
         };
         s.Phase = GamePhase.Event;
         e.Act(new GameAction(ActionType.Choose, 0));
-        // o Carioca já acabou no dia 8; a Copa do Brasil começa no dia 11
+        // em maio o Carioca já acabou; na Copa do Brasil e na Libertadores ele entra na fase em que o Flamengo está
         Assert.DoesNotContain(s.Competitions, c => c.Kind == "state");
-        Assert.Equal(0, s.Competitions.Single(c => c.Kind == "cup").Played);
-        Assert.Equal(3, s.Competitions.Single(c => c.Kind == "continental").Played);
+        Assert.Equal(2, s.Competitions.Single(c => c.Kind == "cup").Played);
+        Assert.Equal(1, s.Competitions.Single(c => c.Kind == "continental").Played);
+        Assert.Equal(SeasonCalendar.Year, s.CalendarType);
     }
 }

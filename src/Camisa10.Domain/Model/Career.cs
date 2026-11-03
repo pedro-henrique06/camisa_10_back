@@ -97,6 +97,10 @@ public class Career
     public CupState? Cup { get; set; }
     /// <summary>Competições do clube na temporada (liga, estadual, copa nacional e continental), com as datas dos jogos.</summary>
     public List<Competition> Competitions { get; set; } = new();
+    /// <summary>Calendário da temporada: "ano" (janeiro a dezembro) ou "europeu" (agosto a maio).</summary>
+    public string? CalendarType { get; set; }
+    /// <summary>Jogo do dia (placar, adversário e narração), para o campo animado.</summary>
+    public MatchState? Match { get; set; }
 
     // ----- Estatísticas -----
     public int SeasonGoals { get; set; }
@@ -252,6 +256,38 @@ public class Competition
     public string? Result { get; set; }
 }
 
+/// <summary>Jogo em andamento: placar, adversário e o que o narrador já contou.</summary>
+public class MatchState
+{
+    /// <summary>Data (rodada) do jogo.</summary>
+    public int Turn { get; set; }
+    public string Kind { get; set; } = "league";
+    public string Competition { get; set; } = "";
+    public string Opponent { get; set; } = "";
+    public int OpponentTier { get; set; }
+    public bool Home { get; set; }
+    public int For { get; set; }
+    public int Against { get; set; }
+    public int Minute { get; set; }
+    public bool Final { get; set; }
+    public List<MatchLine> Feed { get; set; } = new();
+    /// <summary>Onde começa, no <see cref="Feed"/>, o trecho mostrado antes do lance atual.</summary>
+    public int EventMark { get; set; }
+    /// <summary>Onde começa o trecho mostrado depois da decisão.</summary>
+    public int ResultMark { get; set; }
+}
+
+/// <summary>Uma linha da narração, com o placar depois dela.</summary>
+public class MatchLine
+{
+    public int Minute { get; set; }
+    public string Text { get; set; } = "";
+    /// <summary>info, chance-for, chance-against, goal-for, goal-against, whistle, decision.</summary>
+    public string Type { get; set; } = "info";
+    public int For { get; set; }
+    public int Against { get; set; }
+}
+
 /// <summary>Resultado de uma copa no balanço da temporada.</summary>
 public class CompetitionResult
 {
@@ -312,6 +348,8 @@ public class PickResult
     public string? Anim { get; set; }
     /// <summary>Detalhes da cobrança, quando a escolha foi um pênalti.</summary>
     public PenaltyShot? Penalty { get; set; }
+    /// <summary>A decisão foi um lance de partida (o app mostra o campo com a narração).</summary>
+    public bool Match { get; set; }
 }
 
 public class PenaltyShot
