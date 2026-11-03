@@ -43,3 +43,71 @@ public class MatchTests(ITestOutputHelper output)
         Assert.All(finals, m => Assert.True(m.Feed.Count(l => l.Type == "whistle" && l.Text.StartsWith("Fim")) == 1));
     }
 }
+
+public class NationalMatchTests
+{
+    [Fact]
+    public void Torneio_da_selecao_tem_campo_placar_e_narracao()
+    {
+        var rng = new Camisa10.Domain.Game.GameRandom(5);
+        var s = Camisa10.Domain.Game.GameEngine.NewCareer("p", "Teste", "Flamengo", "Brasil", "Atacante", rng);
+        var e = new Camisa10.Domain.Game.GameEngine(s, rng);
+        s.Base = false;
+        s.Age = 24;
+        s.Season = 2;
+        s.ClubId = Camisa10.Domain.World.World.ClubByName("Flamengo")!.Id;
+        s.Club = "Flamengo";
+        s.SetFlag("sel");
+        s.Queue.Clear();
+        s.Scheduled.Clear();
+        s.Competitions.Clear();
+        e.EnsureWorld();
+        s.SeasonDay = Camisa10.Domain.Game.GameEngine.SeasonDays;
+        s.Phase = GamePhase.Calendar;
+        s.CalendarShown = true;
+
+        var games = 0;
+        for (var i = 0; i < 40 && (s.Cup?.On ?? true) && games < 7; i++)
+        {
+            e.Act(new Camisa10.Domain.Game.GameAction(Camisa10.Domain.Game.ActionType.Continue));
+            while (s.Phase == GamePhase.Event && s.Current is { Focus: not "cup" })
+                e.Act(new Camisa10.Domain.Game.GameAction(Camisa10.Domain.Game.ActionType.Choose, 0));
+            if (s.Phase != GamePhase.Event || s.Current?.Focus != "cup") break;
+
+            var view = ViewBuilder.Build(s);
+            var match = view.Event!.Match!;
+            Assert.Equal("national", match.Kind);
+            Assert.Equal("Brasil", match.Team);
+            Assert.Equal("Copa América", match.Competition);
+            Assert.Equal("#f7d117", match.TeamBadge.Primary);
+            Assert.Equal("national", view.Event.Competition!.Kind);
+            Assert.Equal("decision", match.Lines[^1].Type);
+
+            e.Act(new Camisa10.Domain.Game.GameAction(Camisa10.Domain.Game.ActionType.Choose, 1));
+            var result = ViewBuilder.Build(s).Result!.Match!;
+            Assert.True(result.Final);
+            Assert.Contains("do Brasil", result.Lines[^1].Text);
+            // artigo certo para o adversário (ex.: "da França", nunca "do França")
+            var feed = string.Join(" ", s.Match!.Feed.Select(l => l.Text));
+            var wrong = Camisa10.Domain.Game.PtNames.Article(match.Opponent, true) == "o" ? null : "do " + match.Opponent;
+            if (wrong != null) Assert.DoesNotContain(wrong, feed);
+            games++;
+        }
+        Assert.True(games >= 3, "jogou a fase de grupos com o campo");
+    }
+
+    [Theory]
+    [InlineData("Brasil", "do Brasil", "o Brasil")]
+    [InlineData("França", "da França", "a França")]
+    [InlineData("Portugal", "de Portugal", "Portugal")]
+    [InlineData("Coreia do Sul", "da Coreia do Sul", "a Coreia do Sul")]
+    [InlineData("EUA", "dos EUA", "os EUA")]
+    [InlineData("Costa do Marfim", "da Costa do Marfim", "a Costa do Marfim")]
+    [InlineData("Canadá", "do Canadá", "o Canadá")]
+    public void Artigos_das_selecoes(string name, string of, string the)
+    {
+        Assert.Equal(of, Camisa10.Domain.Game.PtNames.Of(name, true));
+        Assert.Equal(the, Camisa10.Domain.Game.PtNames.The(name, true));
+        Assert.Equal("do " + name, Camisa10.Domain.Game.PtNames.Of(name, false));
+    }
+}

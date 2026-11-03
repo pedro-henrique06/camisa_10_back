@@ -1062,7 +1062,7 @@ public sealed partial class GameEngine
         }
         var b = .25 + (cp.Strength ?? s.Tier) * .06 + (s.Overall - 60) / 400.0;
         var stage = new[] { "Oitavas", "Quartas", "Semifinal", "Final" }[cp.Round];
-        Show(new GameEvent
+        ShowCupMatch(cp, new GameEvent
         {
             EventId = "cup" + cp.Round,
             Title = cp.Name + " · " + stage,
@@ -1076,11 +1076,19 @@ public sealed partial class GameEngine
         });
     }
 
+    /// <summary>Jogo de torneio (seleção): o campo animado com placar e narração até o lance decisivo.</summary>
+    private void ShowCupMatch(CupState cp, GameEvent ev)
+    {
+        ev.Focus = "cup";
+        StartMatch(cp.National ? "national" : "cup", cp.Name, new List<GameEvent> { ev }, cp.National ? s.Nation : null);
+        Show(ev);
+    }
+
     private void GroupGame()
     {
         var cp = s.Cup!;
         var b = .3 + (cp.Strength ?? s.Tier) * .06 + (s.Overall - 60) / 400.0;
-        Show(new GameEvent
+        ShowCupMatch(cp, new GameEvent
         {
             EventId = "cg" + cp.Round,
             Title = $"{cp.Name} · Fase de grupos, jogo {4 + cp.Round}",

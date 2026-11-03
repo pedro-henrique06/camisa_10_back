@@ -14,12 +14,13 @@ public sealed partial class GameEngine
     private const double GoalsPerGame = 1.25;
 
     /// <summary>Começa o jogo do dia e marca o minuto de cada lance.</summary>
-    private void StartMatch(string kind, string competition, List<GameEvent> plays)
+    private void StartMatch(string kind, string competition, List<GameEvent> plays, string? team = null)
     {
-        var (opponent, tier) = PickOpponent(kind);
+        var (opponent, tier) = kind == "national" ? PickNationalOpponent(competition) : PickOpponent(kind);
         s.Match = new MatchState
         {
             Turn = s.SeasonDay,
+            Team = team,
             Kind = kind,
             Competition = competition,
             Opponent = opponent,
@@ -38,7 +39,23 @@ public sealed partial class GameEngine
         foreach (var p in plays) p.IsMatch = true;
     }
 
-    private string MyTeam => s.Base ? CleanClub(s.Club) + " sub-20" : s.Club;
+    private string MyTeam => s.Match?.Team ?? (s.Base ? CleanClub(s.Club) + " sub-20" : s.Club);
+
+    private bool National => s.Match?.Kind == "national";
+
+    /// <summary>Preenche a frase: {team}/{opp} (nome), {do team}, {o team}, {O team}, {para o team}.</summary>
+    private string Fill(string text)
+    {
+        var m = s.Match!;
+        foreach (var (key, name) in new[] { ("team", MyTeam), ("opp", m.Opponent) })
+            text = text
+                .Replace("{do " + key + "}", PtNames.Of(name, National))
+                .Replace("{para o " + key + "}", "para " + PtNames.The(name, National))
+                .Replace("{O " + key + "}", PtNames.Cap(PtNames.The(name, National)))
+                .Replace("{o " + key + "}", PtNames.The(name, National))
+                .Replace("{" + key + "}", name);
+        return text;
+    }
 
     /// <summary>Adversário pela competição: liga (mesma divisão), estadual (mesmo estado), copa (mesmo país) ou continental.</summary>
     private (string Name, int Tier) PickOpponent(string kind)
@@ -73,6 +90,21 @@ public sealed partial class GameEngine
         var id = Pick(pool);
         var name = World.World.Club(id)!.Name;
         return (s.Base ? name + " sub-20" : name, layout.TierOf(id));
+    }
+
+    /// <summary>
+    /// Seleção adversária: na Copa do Mundo, qualquer seleção forte; nos torneios continentais,
+    /// uma da mesma confederação.
+    /// </summary>
+    private (string Name, int Tier) PickNationalOpponent(string competition)
+    {
+        var mine = World.World.CountryByName(s.Nation);
+        var pool = World.World.Countries
+            .Where(c => c.Name != s.Nation && (competition == "Copa do Mundo" ? c.NationalStrength >= 1.6 : c.Confederation == mine?.Confederation))
+            .OrderByDescending(c => c.NationalStrength).Take(16).ToList();
+        if (pool.Count == 0) pool = World.World.Countries.Where(c => c.Name != s.Nation).OrderByDescending(c => c.NationalStrength).Take(16).ToList();
+        var c = Pick(pool);
+        return (c.Name, Clamp((int)Math.Round(c.NationalStrength * 1.25), 0, 4));
     }
 
     private bool MatchLive(GameEvent ev) =>
@@ -113,18 +145,18 @@ public sealed partial class GameEngine
         m.Minute = min;
         var me = s.Name;
 
-        if (cur.CompetitionId != null)
+        if (cur.Focus == "cup")
         {
-            // jogo de copa: a decisão define o resultado
+            // jogo de copa ou da seleção: a decisão define o resultado
             if (d.CupWin is > 0)
             {
-                if (m.For <= m.Against) { m.For = m.Against + 1; Line(min, $"GOL! {me} decide para o {MyTeam}!", "goal-for"); }
-                else Line(min, $"{me} segura o resultado e o {MyTeam} administra.", "info");
+                if (m.For <= m.Against) { m.For = m.Against + 1; Line(min, Fill($"GOL! {me} decide {{para o team}}!"), "goal-for"); }
+                else Line(min, Fill($"{me} segura o resultado e {{o team}} administra."), "info");
             }
             else if (d.CupLose is > 0)
             {
-                if (m.Against <= m.For) { m.Against = m.For + 1; Line(min, $"Gol do {m.Opponent}. O castigo vem no detalhe.", "goal-against"); }
-                else Line(min, $"O {m.Opponent} segura a vantagem.", "info");
+                if (m.Against <= m.For) { m.Against = m.For + 1; Line(min, Fill("Gol {do opp}. O castigo vem no detalhe."), "goal-against"); }
+                else Line(min, Fill("{O opp} segura a vantagem."), "info");
             }
             else if (d.CupDraw is > 0)
             {
@@ -132,7 +164,7 @@ public sealed partial class GameEngine
                 {
                     var behind = m.For < m.Against;
                     m.For = m.Against = Math.Max(m.For, m.Against);
-                    Line(min, behind ? $"Empate do {MyTeam}! Não foi a virada, mas vale um ponto." : $"O {m.Opponent} empata no fim.", behind ? "goal-for" : "goal-against");
+                    Line(min, Fill(behind ? "Empate {do team}! Não foi a virada, mas vale um ponto." : "{O opp} empata no fim."), behind ? "goal-for" : "goal-against");
                 }
                 else Line(min, "Ninguém consegue sair do empate.", "info");
             }
@@ -147,17 +179,17 @@ public sealed partial class GameEngine
                 break;
             case "penalty":
                 if (ok) { m.For++; Line(min, $"GOL! {me} bate com categoria e marca de pênalti!", "goal-for"); }
-                else Line(min, $"Perdeu! O goleiro do {m.Opponent} defende o pênalti de {me}.", "chance-for");
+                else Line(min, Fill($"Perdeu! O goleiro {{do opp}} defende o pênalti de {me}."), "chance-for");
                 break;
             case "defense":
-                if (ok) Line(min, $"{me} trava o ataque do {m.Opponent}. Que corte!", "chance-against");
-                else if (Rand() < .55) { m.Against++; Line(min, $"Gol do {m.Opponent}. A jogada passou por você.", "goal-against"); }
-                else Line(min, $"O {m.Opponent} chega perto, mas a bola sai.", "chance-against");
+                if (ok) Line(min, Fill($"{me} trava o ataque {{do opp}}. Que corte!"), "chance-against");
+                else if (Rand() < .55) { m.Against++; Line(min, Fill("Gol {do opp}. A jogada passou por você."), "goal-against"); }
+                else Line(min, Fill("{O opp} chega perto, mas a bola sai."), "chance-against");
                 break;
             default:
-                if (ok && d.Goals is > 0) { m.For++; Line(min, $"GOL! {me} marca para o {MyTeam}!", "goal-for"); }
-                else if (ok && d.Assists is > 0) { m.For++; Line(min, $"GOL do {MyTeam}! Assistência de {me}.", "goal-for"); }
-                else if (ok) Line(min, $"Boa jogada de {me}, o {MyTeam} cresce no jogo.", "chance-for");
+                if (ok && d.Goals is > 0) { m.For++; Line(min, Fill($"GOL! {me} marca {{para o team}}!"), "goal-for"); }
+                else if (ok && d.Assists is > 0) { m.For++; Line(min, Fill($"GOL {{do team}}! Assistência de {me}."), "goal-for"); }
+                else if (ok) Line(min, Fill($"Boa jogada de {me}, {{o team}} cresce no jogo."), "chance-for");
                 else Line(min, $"Por pouco! {me} não consegue completar a jogada.", "chance-for");
                 break;
         }
@@ -171,7 +203,7 @@ public sealed partial class GameEngine
         Simulate(90, cup: false, goals: goals);
         var result = m.For > m.Against ? "vitória" : m.For < m.Against ? "derrota" : "empate";
         var (home, away, hg, ag) = m.Home ? (MyTeam, m.Opponent, m.For, m.Against) : (m.Opponent, MyTeam, m.Against, m.For);
-        Line(90, $"Fim de jogo: {home} {hg} x {ag} {away}. {char.ToUpper(result[0]) + result[1..]} do {MyTeam}.", "whistle");
+        Line(90, Fill($"Fim de jogo: {home} {hg} x {ag} {away}. {char.ToUpper(result[0]) + result[1..]} {{do team}}."), "whistle");
         m.Final = true;
     }
 
@@ -180,31 +212,31 @@ public sealed partial class GameEngine
         "{team} troca passes no meio-campo.",
         "{opp} tenta pelo lado esquerdo, mas a zaga afasta.",
         "Falta dura no meio. O árbitro conversa com os jogadores.",
-        "Chute de longe do {opp}, por cima do gol.",
+        "Chute de longe {do opp}, por cima do gol.",
         "{team} pressiona a saída de bola.",
-        "Escanteio para o {team}. A zaga tira de cabeça.",
-        "Contra-ataque do {opp}! O lateral volta a tempo.",
+        "Escanteio {para o team}. A zaga tira de cabeça.",
+        "Contra-ataque {do opp}! O lateral volta a tempo.",
         "A torcida canta alto na arquibancada.",
         "{team} gira a bola e procura espaço.",
-        "Cartão amarelo para o volante do {opp}."
+        "Cartão amarelo para o volante {do opp}."
     };
 
     private static readonly string[] GoalsFor =
     {
-        "GOL do {team}! O centroavante completa para a rede.",
-        "GOL do {team}! O camisa 9 sobe mais que todo mundo e cabeceia no canto.",
-        "GOL do {team}! O ponta corta para dentro e bate colocado.",
-        "GOL do {team}! Chute de fora da área do meia, no ângulo.",
-        "GOL do {team}! O zagueiro aproveita o escanteio."
+        "GOL {do team}! O centroavante completa para a rede.",
+        "GOL {do team}! O camisa 9 sobe mais que todo mundo e cabeceia no canto.",
+        "GOL {do team}! O ponta corta para dentro e bate colocado.",
+        "GOL {do team}! Chute de fora da área do meia, no ângulo.",
+        "GOL {do team}! O zagueiro aproveita o escanteio."
     };
 
     private static readonly string[] GoalsAgainst =
     {
-        "Gol do {opp}. Bola no fundo da rede.",
-        "Gol do {opp}. Contra-ataque rápido e finalização cruzada.",
-        "Gol do {opp}. Cabeçada após cruzamento da direita.",
-        "Gol do {opp}. Chute desviado que engana o goleiro.",
-        "Gol do {opp}. O atacante deles aproveita a sobra na área."
+        "Gol {do opp}. Bola no fundo da rede.",
+        "Gol {do opp}. Contra-ataque rápido e finalização cruzada.",
+        "Gol {do opp}. Cabeçada após cruzamento da direita.",
+        "Gol {do opp}. Chute desviado que engana o goleiro.",
+        "Gol {do opp}. O atacante deles aproveita a sobra na área."
     };
 
     /// <summary>
@@ -224,17 +256,17 @@ public sealed partial class GameEngine
             if (goals && Rand() < pFor)
             {
                 m.For++;
-                Line(min, Pick(GoalsFor).Replace("{team}", MyTeam), "goal-for");
+                Line(min, Fill(Pick(GoalsFor)), "goal-for");
             }
             else if (goals && Rand() < pAgainst)
             {
                 m.Against++;
-                Line(min, Pick(GoalsAgainst).Replace("{opp}", m.Opponent), "goal-against");
+                Line(min, Fill(Pick(GoalsAgainst)), "goal-against");
             }
             else if (flavorLeft > 0 && Rand() < 2.2 / Math.Max(1, to - m.Minute))
             {
                 flavorLeft--;
-                var t = Pick(Flavor).Replace("{team}", MyTeam).Replace("{opp}", m.Opponent);
+                var t = Fill(Pick(Flavor));
                 Line(min, t, t.StartsWith("Chute") || t.StartsWith("Contra") ? "chance-against" : t.StartsWith("Escanteio") ? "chance-for" : "info");
             }
             m.Minute = min;
