@@ -30,12 +30,14 @@ public sealed partial class GameEngine
     private T Pick<T>(IReadOnlyList<T> list) => list[R(0, list.Count - 1)];
 
     // ------------------------------------------------------------------ nova carreira (start)
+    /// <param name="baseClub">Id do clube no mundo (ou o nome, para compatibilidade).</param>
     public static Career NewCareer(string playerId, string name, string baseClub, string nation, string position, IGameRandom? rng = null)
     {
-        var bc = GameData.BaseClubs.FirstOrDefault(x => x.Club == baseClub);
-        if (bc.Club == null) throw new GameRuleException($"Clube de base inválido: {baseClub}");
+        var club = World.World.Club(baseClub) ?? World.World.ClubByName(baseClub)
+                   ?? throw new GameRuleException($"Clube de base inválido: {baseClub}");
         if (!GameData.Positions.Contains(position)) throw new GameRuleException($"Posição inválida: {position}");
-        if (GameData.Nations.All(n => n.Nation != nation)) throw new GameRuleException($"Seleção inválida: {nation}");
+        if (World.World.CountryByName(nation) == null) throw new GameRuleException($"Seleção inválida: {nation}");
+        var baseTier = World.World.Tier(club.CountryIso, World.World.InitialDivision(club.Id), club.Prestige);
 
         var c = new Career
         {
@@ -48,12 +50,14 @@ public sealed partial class GameEngine
             Fame = 2,
             Money = 5,
             Fitness = 90,
-            Trust = 50 - (bc.Tier - 2) * 8,
+            Trust = 50 - (baseTier - 2) * 8,
             Tier = 0,
             Base = true,
-            BaseClub = bc.Club,
-            BaseTier = bc.Tier,
-            Club = "Base do " + bc.Club,
+            BaseClub = club.Name,
+            BaseClubId = club.Id,
+            ClubId = club.Id,
+            BaseTier = baseTier,
+            Club = "Base do " + club.Name,
             Nation = nation,
             Salary = 2,
             Fans = 50,
@@ -64,6 +68,7 @@ public sealed partial class GameEngine
             RivalOverall = 55
         };
         var engine = new GameEngine(c, rng);
+        c.WorldSeed = engine.R(1, 1_000_000_000);
         c.Potential = engine.R(72, 94);
         c.Rival = GameData.Rivals[engine.R(0, 4)];
         c.Attributes = engine.MakeAttributes(position, 55);
@@ -76,6 +81,7 @@ public sealed partial class GameEngine
     {
         if (s.Status == CareerStatus.Finished)
             throw new GameRuleException("A carreira já terminou.");
+        EnsureWorld();
 
         switch (action.Type)
         {
@@ -161,7 +167,7 @@ public sealed partial class GameEngine
             {
                 s.NationalCupDone = true;
                 s.SetFlag("sel");
-                StartCup(NationalCupName(), GameData.Nations.First(n => n.Nation == s.Nation).Strength, true);
+                StartCup(NationalCupName(), NationalStrength(), true);
                 return;
             }
             var cn = ClubCupName();
@@ -406,8 +412,8 @@ public sealed partial class GameEngine
 
         if (d.Tier is { } dk && dk != 0 && !s.Base)
         {
-            s.Tier = Clamp(s.Tier + dk, 0, 4);
-            s.Club = d.Club ?? PickClub(s.Tier);
+            var target = Clamp(s.Tier + dk, 0, 4);
+            MoveToClub(World.World.ClubByName(d.Club) ?? PickWorldClub(target));
             res.ClubChanged = true;
         }
         if (d.Contract is { } ct && ct != 0) s.Contract = Math.Max(0, s.Contract + ct);
@@ -435,8 +441,9 @@ public sealed partial class GameEngine
         if (d.CupLose is > 0 && s.Cup != null) s.Cup.On = false;
         if (d.NewClub != null)
         {
-            s.Tier = d.NewClubTier ?? s.Tier;
-            s.Club = d.NewClub;
+            var target = World.World.Club(d.NewClubId) ?? World.World.ClubByName(d.NewClub);
+            if (target != null) MoveToClub(target);
+            else { s.Tier = d.NewClubTier ?? s.Tier; s.Club = d.NewClub; }
             s.ReleaseClause = 0;
             s.GoalBonus = 0;
             s.Fans = 55;
@@ -587,11 +594,7 @@ public sealed partial class GameEngine
     }
 
     // ------------------------------------------------------------------ clubes e dinheiro
-    private string PickClub(int tier)
-    {
-        var list = GameData.ClubsByTier[tier].Where(c => c != s.Club).ToList();
-        return Pick(list);
-    }
+    private string PickClub(int tier) => PickWorldClub(tier).Name;
 
     /// <summary>Valor de mercado em milhões (mvf).</summary>
     private int MarketValue(int tier) => Math.Max(5, Round((s.Overall - 40) * (tier + 1) * .9));
@@ -604,18 +607,13 @@ public sealed partial class GameEngine
         s.Base = false;
         s.Tier = s.BaseTier;
         s.Club = s.BaseClub;
+        s.ClubId = s.BaseClubId ?? s.ClubId;
+        RefreshClub();
         s.Contract = 3;
         s.Salary = Math.Max(3, Round(SalaryFor(s.Tier) * .25));
     }
 
     public static string CleanClub(string club) => club.Replace("Base do ", "");
-
-    public static string? CountryOf(string club)
-    {
-        club = CleanClub(club);
-        foreach (var (country, clubs) in GameData.ClubCountries) if (clubs.Contains(club)) return country;
-        return null;
-    }
 
     public record TrainingRoutine(int Sessions, string Focus, string FocusName);
 
@@ -638,6 +636,8 @@ public sealed partial class GameEngine
         s.Season++;
         s.SeasonDay = 0;
         s.SeasonStartOverall = s.Overall;
+        // acesso e rebaixamento da temporada anterior mudam a divisão (e o nível) do clube
+        RefreshClub();
         s.CupDone = false;
         s.NationalCupDone = false;
         s.BallonCheckDone = false;
@@ -655,6 +655,13 @@ public sealed partial class GameEngine
         var asst = Round(jg * ra * factor * .6) + s.SeasonAssists;
         var team = 10 + s.Tier * 14 + R(0, 40);
         var title = team + perf / 4 >= 105 || s.TitleBonus > 0;
+        // No profissional, a posição na liga vem da tabela do mundo; campeão é quem termina em 1º.
+        (int Rank, int Size, string? Movement, List<TableRow> Table)? league = null;
+        if (!s.Base && s.ClubId != null && Layout().Of(s.ClubId) != null)
+        {
+            league = FinishLeague(perf, s.TitleBonus > 0);
+            title = league.Value.Rank == 1;
+        }
         var nota = Round1(Clamp(4 + perf / 14, 4.5, 9.8));
 
         var mgv = s.SeasonGoals;
@@ -666,10 +673,12 @@ public sealed partial class GameEngine
         s.RivalOverall = Clamp(s.RivalOverall + (s.Age <= 28 ? R(0, 3) : -R(0, 2)));
         if (s.RivalOverall > 68 && Rand() < .3) s.RivalTitles++;
         s.RivalGoals += Round(s.RivalOverall / 7.0);
-        s.RivalClub = Pick(GameData.ClubsByTier[Clamp((int)Math.Floor((s.RivalOverall - 40) / 10.0), 0, 4)]);
+        s.RivalClub = PickClub(Clamp((int)Math.Floor((s.RivalOverall - 40) / 10.0), 0, 4));
 
         var hl = Headline(nota, title, gl);
         s.Headlines.Add(hl);
+        if (league?.Movement == "up") s.Headlines.Add($"{s.Club} conquista o acesso! {s.Name} comemora a subida");
+        if (league?.Movement == "down") s.Headlines.Add($"{s.Club} é rebaixado e {s.Name} vê o clube cair de divisão");
         s.Goals += gl;
         s.Assists += asst;
         s.Games += jg;
@@ -706,7 +715,12 @@ public sealed partial class GameEngine
             Headline = hl,
             Era = Era(),
             Profile = Profile(),
-            Title = title
+            Title = title,
+            LeagueName = league != null ? s.LeagueName : null,
+            Rank = league?.Rank ?? 0,
+            LeagueSize = league?.Size ?? 0,
+            Movement = league?.Movement,
+            Table = league?.Table ?? new List<TableRow>()
         };
         s.Phase = GamePhase.SeasonSummary;
     }
@@ -776,15 +790,16 @@ public sealed partial class GameEngine
         var offers = new List<MarketOffer>();
         for (var i = 0; i < 16 && offers.Count < n; i++)
         {
-            var t = Clamp(s.Tier + R(-1, 1), 0, 4);
-            var c = PickClub(t);
-            if (offers.Any(x => x.Club == c)) continue;
+            var club = PickWorldClub(Clamp(s.Tier + R(-1, 1), 0, 4));
+            var c = club.Name;
+            var t = TierOfClub(club.Id);
+            if (offers.Any(x => x.ClubId == club.Id)) continue;
             var fee = Round(MarketValue(t) * R(80, 130) / 100.0);
             if (fee < s.ReleaseClause * .5) continue;
             var bonus = mode == "ev" ? 1 : 1 + (s.Agent - 50) / 250.0;
             var sl = Round(SalaryFor(t) * R(90, 125) / 100.0 * bonus * 10) / 10.0;
             var lv = Round(fee * .05 * 10) / 10.0;
-            offers.Add(new MarketOffer { Club = c, Tier = t, Fee = fee, Salary = sl, SigningBonus = lv });
+            offers.Add(new MarketOffer { ClubId = club.Id, Club = c, Tier = t, Fee = fee, Salary = sl, SigningBonus = lv });
         }
         if (offers.Count == 0)
         {
@@ -802,7 +817,7 @@ public sealed partial class GameEngine
     private void Sign(int i)
     {
         var x = s.MarketOffers[i];
-        var country = CountryOf(x.Club);
+        var country = CountryOfId(x.ClubId)?.Name ?? CountryOf(x.Club);
         s.Headlines.Add($"{s.Name} é anunciado pelo {x.Club} por R$ {Fmt.Num(x.Fee)} mi");
         s.Current = new GameEvent
         {
@@ -815,7 +830,7 @@ public sealed partial class GameEngine
                     SuccessText = $"O {x.Club} ({country}) paga R$ {Fmt.Num(x.Fee)} mi ao seu clube. Você recebe luvas de R$ {Fmt.Num(x.SigningBonus)} mi e salário de R$ {Fmt.Num(x.Salary)} mil por mês.",
                     Success = new Fx
                     {
-                        NewClub = x.Club, NewClubTier = x.Tier, Money = x.SigningBonus, Salary = x.Salary,
+                        NewClub = x.Club, NewClubId = x.ClubId, NewClubTier = x.Tier, Money = x.SigningBonus, Salary = x.Salary,
                         Morale = 4, Trust = -6, Agent = s.Has("emp") ? 4 : 0, Contract = 3
                     }
                 }
@@ -970,16 +985,6 @@ public sealed partial class GameEngine
     }
 
     // ------------------------------------------------------------------ copas
-    public string? ClubCupName()
-    {
-        var names = GameData.SouthAmerican.Contains(s.Club)
-            ? new[] { "", "Copa Estadual", "Copa do Brasil", "Libertadores", "Libertadores" }
-            : new[] { "", "Copa Nacional", "Copa da Liga", "Liga Europa", "Liga dos Campeões" };
-        var n = names[s.Tier];
-        return n == "" ? null : n;
-    }
-
-    private string NationalCupName() => s.Season % 4 == 0 ? "Copa do Mundo" : GameData.Continental.GetValueOrDefault(s.Nation, "Eurocopa");
 
     private void StartCup(string name, double? strength, bool national)
     {

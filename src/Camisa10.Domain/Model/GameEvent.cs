@@ -96,6 +96,7 @@ public class Fx
     public int? CupDraw { get; set; }
     public int? CupLose { get; set; }
     public string? NewClub { get; set; }
+    public string? NewClubId { get; set; }
     public int? NewClubTier { get; set; }
     public int? Goals { get; set; }
     public int? Assists { get; set; }

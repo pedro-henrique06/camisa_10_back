@@ -39,13 +39,43 @@ src/
     Game/                  GameEngine (fluxo, escolhas, mercado, copas, temporada)
                            Events.Generated.cs (catálogo de ~190 eventos)
                            GameData.cs (clubes, seleções, pesos por posição)
+    World/                 os 211 países da FIFA, ligas A/B/C e acesso e rebaixamento
+    Data/world.json        dados do mundo (gerado por tools/world/build_world.py)
     Views/                 o que a API devolve para o app desenhar cada tela
   Camisa10.Api/            ASP.NET Core + EF Core/MongoDB
     Data/                  Camisa10DbContext
     Endpoints/             rotas HTTP
 tests/Camisa10.Tests/      simulação de carreiras + testes de integração
 tools/gen-events.js        gera o catálogo de eventos a partir do index.html original
+tools/world/               dados dos países e clubes e o gerador do world.json
 ```
+
+## Ligas do mundo
+
+O jogo tem os **211 países da FIFA**, cada um com **três divisões (A, B e C)**: cerca de 2.400 clubes reais e
+5.200 fictícios. Os clubes reais vêm das listas em `tools/world/data_*.py`, conferidas com o
+[openfootball](https://github.com/openfootball/football.json) (domínio público) onde ele tem a liga.
+Nas divisões sem dados conhecidos, sobretudo em países pequenos, os clubes são fictícios com nomes de
+cidades reais (marcados com `"f": 1` no `world.json`). Alguns clubes reais podem estar na divisão errada
+por acesso ou rebaixamento recente; para corrigir, edite a lista e regere:
+
+    python3 tools/world/build_world.py tools/world/openfootball-2025.json
+
+- **Força do clube**: qualidade da liga do país × peso da divisão × tamanho do clube (a ordem nas listas,
+  do maior para o menor, no país inteiro). Ela vira o nível de 0 a 4 usado em salários, mercado, eventos e copas.
+- **Acesso e rebaixamento em todas as ligas**: ao fim de cada temporada, os 3 primeiros de cada divisão sobem
+  e os 3 últimos caem (2 em ligas de 10 a 15 clubes, 1 em ligas menores). A simulação é determinística: a
+  carreira guarda só a semente (`WorldSeed`) e a posição final do clube do jogador em cada temporada
+  (`ClubSeasons`), e as divisões de qualquer temporada são recalculadas a partir disso.
+- **Posição do clube do jogador**: parte da força do clube e melhora ou piora com o desempenho do jogador.
+  Campeão é quem termina em 1º. O balanço da temporada mostra a tabela com as zonas de acesso e rebaixamento.
+- **Propostas**: de clubes do mundo inteiro com o nível parecido, com mais chance para o próprio país, a mesma
+  confederação, ligas fortes e clubes reais.
+- **Copas**: dependem da confederação, da divisão e do nível do clube (copa nacional, Liga dos Campeões,
+  Libertadores, Copa Sul-Americana…). Seleções: as 211, com Copa do Mundo a cada 4 temporadas e o torneio
+  continental de cada confederação nas outras.
+
+Carreiras criadas antes das ligas do mundo ganham semente e clube do mundo (pelo nome) na primeira ação.
 
 ## Como o jogo funciona no servidor
 
@@ -83,9 +113,12 @@ Todas as rotas de carreira exigem o cabeçalho `X-Player-Id` (8 a 64 caracteres;
 
 | Método | Rota | Descrição |
 | --- | --- | --- |
-| GET | `/api/meta` | clubes de base, seleções e posições |
+| GET | `/api/meta` | clubes em destaque, as 211 seleções e as posições |
+| GET | `/api/world` | os 211 países com as suas três divisões |
+| GET | `/api/world/{iso}` | clubes das divisões A, B e C de um país (ex.: `BR`, `GB-ENG`) |
+| GET | `/api/world/search?q=` | busca clubes pelo nome |
 | GET | `/api/careers?status=Active` | carreiras do jogador (`Active` ou `Finished`) |
-| POST | `/api/careers` | nova carreira `{ name, club, nation, position }` |
+| POST | `/api/careers` | nova carreira `{ name, club, nation, position }` (`club` é o id do clube no mundo) |
 | GET | `/api/careers/{id}` | tela atual |
 | POST | `/api/careers/{id}/actions` | `{ type, index?, power?, version }` e devolve a nova tela |
 | GET | `/api/careers/{id}/history` | evolução temporada a temporada |

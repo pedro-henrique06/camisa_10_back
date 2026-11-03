@@ -21,7 +21,16 @@ public static partial class CareerEndpoints
         var api = app.MapGroup("/api");
 
         api.MapGet("/meta", () => TypedResults.Ok(ViewBuilder.Meta()))
-            .WithSummary("Clubes de base, seleções e posições para a tela inicial.");
+            .WithSummary("Clubes em destaque, seleções e posições para a tela inicial.");
+
+        var world = api.MapGroup("/world");
+        world.MapGet("/", () => TypedResults.Ok(ViewBuilder.Countries()))
+            .WithSummary("Os 211 países com as suas três divisões.");
+        world.MapGet("/search", (string? q) => TypedResults.Ok(ViewBuilder.SearchClubs(q ?? "")))
+            .WithSummary("Busca clubes do mundo pelo nome.");
+        world.MapGet("/{iso}", Results<Ok<CountryView>, NotFound> (string iso) =>
+                ViewBuilder.Country(iso) is { } c ? TypedResults.Ok(c) : TypedResults.NotFound())
+            .WithSummary("Clubes das divisões A, B e C de um país.");
 
         var careers = api.MapGroup("/careers").AddEndpointFilter(RequirePlayer);
 

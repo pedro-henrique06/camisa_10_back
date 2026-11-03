@@ -55,6 +55,18 @@ public class Career
     public Attributes SeasonStartAttributes { get; set; } = new();
     public int SeasonStartOverall { get; set; }
 
+    // ----- Mundo (ligas, divisões, acesso e rebaixamento) -----
+    /// <summary>Semente da simulação das ligas do mundo desta carreira.</summary>
+    public int WorldSeed { get; set; }
+    /// <summary>Id do clube atual no mundo (ver World/World.cs).</summary>
+    public string? ClubId { get; set; }
+    public string? BaseClubId { get; set; }
+    /// <summary>Divisão atual do clube (0 = A, 1 = B, 2 = C).</summary>
+    public int Division { get; set; }
+    public string? LeagueName { get; set; }
+    /// <summary>Posição final do clube do jogador em cada temporada (usada para simular o mundo).</summary>
+    public List<ClubSeasonResult> ClubSeasons { get; set; } = new();
+
     // ----- Clube e contrato -----
     public bool Base { get; set; } = true;
     public string BaseClub { get; set; } = "";
@@ -229,8 +241,27 @@ public class SeasonRecord
     public bool Title { get; set; }
 }
 
+public class ClubSeasonResult
+{
+    public int Season { get; set; }
+    public string ClubId { get; set; } = "";
+    public int Division { get; set; }
+    public int Rank { get; set; }
+    public int Size { get; set; }
+}
+
+public class TableRow
+{
+    public int Position { get; set; }
+    public string Club { get; set; } = "";
+    public bool Mine { get; set; }
+    /// <summary>"up" (sobe), "down" (cai) ou nulo.</summary>
+    public string? Zone { get; set; }
+}
+
 public class MarketOffer
 {
+    public string? ClubId { get; set; }
     public string Club { get; set; } = "";
     public int Tier { get; set; }
     public double Fee { get; set; }
@@ -299,4 +330,10 @@ public class SeasonReport
     public string Era { get; set; } = "";
     public string Profile { get; set; } = "";
     public bool Title { get; set; }
+    public string? LeagueName { get; set; }
+    public int Rank { get; set; }
+    public int LeagueSize { get; set; }
+    /// <summary>"up" (acesso), "down" (rebaixamento) ou nulo.</summary>
+    public string? Movement { get; set; }
+    public List<TableRow> Table { get; set; } = new();
 }

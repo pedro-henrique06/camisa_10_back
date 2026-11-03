@@ -3,17 +3,7 @@ namespace Camisa10.Domain.Game;
 /// <summary>Tabelas fixas do jogo (clubes, países, seleções, posições).</summary>
 public static class GameData
 {
-    /// <summary>Clubes por nível (0 = menor, 4 = gigante europeu).</summary>
-    public static readonly string[][] ClubsByTier =
-    {
-        new[] { "Ferroviária", "Ituano", "Londrina", "Operário-PR", "Botafogo-SP", "Cádiz", "Lecce", "Brest" },
-        new[] { "Goiás", "Coritiba", "Vitória", "Sport", "Ceará", "Juventude", "Bahia", "Vasco", "Peñarol", "Nacional", "Colo-Colo", "Celtic", "Anderlecht" },
-        new[] { "Internacional", "Atlético-MG", "Fluminense", "Grêmio", "Santos", "Cruzeiro", "Botafogo", "Corinthians", "São Paulo", "Independiente", "Racing", "Sevilla", "Valencia", "Roma", "Lazio", "Napoli", "Tottenham", "Newcastle", "Marseille", "Lyon", "Galatasaray", "Sporting", "Feyenoord" },
-        new[] { "Flamengo", "Palmeiras", "Boca Juniors", "River Plate", "Benfica", "Porto", "Ajax", "Borussia Dortmund", "Atlético de Madrid", "Manchester United", "Chelsea", "Juventus", "Inter de Milão", "Milan" },
-        new[] { "Real Madrid", "Barcelona", "Manchester City", "Bayern de Munique", "PSG", "Liverpool", "Arsenal" }
-    };
-
-    /// <summary>Clubes que podem ser escolhidos como base, com o nível de entrada no profissional.</summary>
+    /// <summary>Clubes em destaque na tela inicial (o nível real vem do mundo, em World/World.cs).</summary>
     public static readonly (string Club, int Tier)[] BaseClubs =
     {
         ("Flamengo", 3), ("Palmeiras", 3), ("Corinthians", 2), ("São Paulo", 2), ("Santos", 2), ("Grêmio", 2),
@@ -22,42 +12,6 @@ public static class GameData
         ("Manchester City", 4), ("Manchester United", 3), ("Liverpool", 4), ("Chelsea", 3), ("Arsenal", 4),
         ("Bayern de Munique", 4), ("Borussia Dortmund", 3), ("PSG", 4), ("Juventus", 3), ("Inter de Milão", 3),
         ("Milan", 3), ("Benfica", 3), ("Porto", 3), ("Ajax", 3)
-    };
-
-    public static readonly Dictionary<string, string> CountryFlags = new()
-    {
-        ["Brasil"] = "🇧🇷", ["Espanha"] = "🇪🇸", ["Itália"] = "🇮🇹", ["França"] = "🇫🇷", ["Uruguai"] = "🇺🇾", ["Chile"] = "🇨🇱",
-        ["Bélgica"] = "🇧🇪", ["Argentina"] = "🇦🇷", ["Inglaterra"] = "🇬🇧", ["Turquia"] = "🇹🇷", ["Portugal"] = "🇵🇹",
-        ["Holanda"] = "🇳🇱", ["Alemanha"] = "🇩🇪", ["Arábia Saudita"] = "🇸🇦"
-    };
-
-    /// <summary>País de cada clube (ordem de busca igual à do original).</summary>
-    public static readonly (string Country, string[] Clubs)[] ClubCountries =
-    {
-        ("Brasil", new[] { "Ferroviária", "Ituano", "Londrina", "Operário-PR", "Botafogo-SP", "Goiás", "Coritiba", "Vitória", "Sport", "Ceará", "Juventude", "Bahia", "Vasco", "Internacional", "Atlético-MG", "Fluminense", "Grêmio", "Santos", "Cruzeiro", "Botafogo", "Corinthians", "São Paulo", "Flamengo", "Palmeiras" }),
-        ("Espanha", new[] { "Cádiz", "Sevilla", "Valencia", "Atlético de Madrid", "Real Madrid", "Barcelona" }),
-        ("Itália", new[] { "Lecce", "Roma", "Lazio", "Napoli", "Juventus", "Inter de Milão", "Milan" }),
-        ("França", new[] { "Brest", "Marseille", "Lyon", "PSG" }),
-        ("Uruguai", new[] { "Peñarol", "Nacional" }),
-        ("Chile", new[] { "Colo-Colo" }),
-        ("Escócia", new[] { "Celtic" }),
-        ("Bélgica", new[] { "Anderlecht" }),
-        ("Argentina", new[] { "Independiente", "Racing", "Boca Juniors", "River Plate" }),
-        ("Inglaterra", new[] { "Tottenham", "Newcastle", "Manchester United", "Chelsea", "Manchester City", "Liverpool", "Arsenal" }),
-        ("Turquia", new[] { "Galatasaray" }),
-        ("Portugal", new[] { "Sporting", "Benfica", "Porto" }),
-        ("Holanda", new[] { "Feyenoord", "Ajax" }),
-        ("Alemanha", new[] { "Borussia Dortmund", "Bayern de Munique" }),
-        ("Arábia Saudita", new[] { "Al-Hilal" })
-    };
-
-    public static readonly Dictionary<string, string> Leagues = new()
-    {
-        ["Brasil"] = "Campeonato Brasileiro", ["Espanha"] = "Liga espanhola", ["Itália"] = "Campeonato italiano",
-        ["França"] = "Campeonato francês", ["Inglaterra"] = "Campeonato inglês", ["Alemanha"] = "Campeonato alemão",
-        ["Portugal"] = "Campeonato português", ["Holanda"] = "Campeonato holandês", ["Argentina"] = "Campeonato argentino",
-        ["Uruguai"] = "Campeonato uruguaio", ["Chile"] = "Campeonato chileno", ["Turquia"] = "Campeonato turco",
-        ["Arábia Saudita"] = "Campeonato saudita", ["Bélgica"] = "Campeonato belga", ["Escócia"] = "Campeonato escocês"
     };
 
     /// <summary>Cores dos escudos (primária, secundária).</summary>
@@ -74,29 +28,6 @@ public static class GameData
         ["PSG"] = ("#004170", "#da291c"), ["Juventus"] = ("#111111", "#ffffff"), ["Inter de Milão"] = ("#0a2a6b", "#111111"),
         ["Milan"] = ("#fb090b", "#111111"), ["Benfica"] = ("#e30613", "#ffffff"), ["Porto"] = ("#0a3a82", "#ffffff"),
         ["Ajax"] = ("#d2122e", "#ffffff"), ["Al-Hilal"] = ("#0a3a82", "#ffffff")
-    };
-
-    /// <summary>Força de cada seleção.</summary>
-    public static readonly (string Nation, double Strength, string Flag)[] Nations =
-    {
-        ("Brasil", 3.2, "🇧🇷"), ("Argentina", 3.2, "🇦🇷"), ("França", 3.2, "🇫🇷"), ("Inglaterra", 3, "🇬🇧"), ("Espanha", 3, "🇪🇸"),
-        ("Alemanha", 3, "🇩🇪"), ("Portugal", 2.8, "🇵🇹"), ("Itália", 2.8, "🇮🇹"), ("Holanda", 2.6, "🇳🇱"), ("Bélgica", 2.4, "🇧🇪"),
-        ("Uruguai", 2.4, "🇺🇾"), ("Croácia", 2.2, "🇭🇷"), ("Marrocos", 2, "🇲🇦"), ("Japão", 1.8, "🇯🇵"), ("México", 1.8, "🇲🇽"),
-        ("EUA", 1.6, "🇺🇸")
-    };
-
-    public static readonly Dictionary<string, string> Continental = new()
-    {
-        ["Brasil"] = "Copa América", ["Argentina"] = "Copa América", ["Uruguai"] = "Copa América", ["México"] = "Copa Ouro",
-        ["EUA"] = "Copa Ouro", ["Marrocos"] = "Copa Africana", ["Japão"] = "Copa da Ásia"
-    };
-
-    /// <summary>Clubes que disputam as copas sul-americanas.</summary>
-    public static readonly HashSet<string> SouthAmerican = new()
-    {
-        "Flamengo", "Palmeiras", "Corinthians", "São Paulo", "Santos", "Grêmio", "Internacional", "Cruzeiro", "Atlético-MG",
-        "Fluminense", "Botafogo", "Vasco", "Boca Juniors", "River Plate", "Independiente", "Racing", "Peñarol", "Nacional",
-        "Colo-Colo", "Goiás", "Coritiba", "Vitória", "Sport", "Ceará", "Juventude", "Bahia"
     };
 
     public static readonly string[] Positions = { "Atacante", "Ponta", "Meia", "Volante", "Lateral", "Zagueiro" };
