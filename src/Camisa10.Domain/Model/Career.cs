@@ -249,6 +249,19 @@ public class PickResult
     public List<Chip> Chips { get; set; } = new();
     /// <summary>Animação especial: "capt" (braçadeira), "trophy", "ball".</summary>
     public string? Anim { get; set; }
+    /// <summary>Detalhes da cobrança, quando a escolha foi um pênalti.</summary>
+    public PenaltyShot? Penalty { get; set; }
+}
+
+public class PenaltyShot
+{
+    /// <summary>Canto escolhido (0-2 em cima, 3-5 embaixo, da esquerda para a direita).</summary>
+    public int Zone { get; set; }
+    public int Power { get; set; }
+    /// <summary>"goal", "save", "post" ou "out".</summary>
+    public string Outcome { get; set; } = "";
+    /// <summary>Canto para onde o goleiro pulou.</summary>
+    public int KeeperZone { get; set; }
 }
 
 public class DiceRoll

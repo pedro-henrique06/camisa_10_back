@@ -87,7 +87,7 @@ public static partial class CareerEndpoints
 
         try
         {
-            new GameEngine(career).Act(new GameAction(req.Type, req.Index));
+            new GameEngine(career).Act(new GameAction(req.Type, req.Index, req.Power));
         }
         catch (GameRuleException e)
         {

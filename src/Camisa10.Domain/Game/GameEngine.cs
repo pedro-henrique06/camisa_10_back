@@ -106,7 +106,7 @@ public sealed partial class GameEngine
                         Pick(i); return;
                     case GamePhase.Penalty:
                         if (i < 0 || i >= GameData.PenaltyZones.Length) throw new GameRuleException("Ponto do gol inválido.");
-                        Shoot(i); return;
+                        Shoot(i, action.Power); return;
                     case GamePhase.Market:
                         if (i < 0 || i >= s.MarketOffers.Count) throw new GameRuleException("Proposta inválida.");
                         Sign(i); return;
@@ -892,10 +892,24 @@ public sealed partial class GameEngine
     }
 
     // ------------------------------------------------------------------ pênalti (shoot)
-    private void Shoot(int i)
+    /// <summary>Faixa de força ideal da barra do pênalti (0 a 100).</summary>
+    public const int PenaltyPowerMin = 60, PenaltyPowerMax = 85;
+
+    /// <summary>
+    /// Cobrança de pênalti num dos 6 cantos (0-2 em cima, 3-5 embaixo) com a força da barra.
+    /// Fraca demais facilita a defesa; forte demais pode isolar a bola, principalmente nos cantos altos.
+    /// </summary>
+    private void Shoot(int i, int? powerInput)
     {
         var z = GameData.PenaltyZones[i];
-        var p = Clamp(z.Chance + (s.Attributes.Chu - 60) / 220.0 + (s.Morale - 50) / 300.0, .3, .92);
+        var power = Math.Clamp(powerInput ?? 72, 0, 100);
+        var high = i <= 2;
+        var basis = Clamp(z.Chance + (s.Attributes.Chu - 60) / 220.0 + (s.Morale - 50) / 300.0, .3, .92);
+        var adj = power < PenaltyPowerMin ? -Math.Min(.45, (PenaltyPowerMin - power) / 100.0)
+            : power <= PenaltyPowerMax ? .03
+            : -(power - PenaltyPowerMax) / (100.0 - PenaltyPowerMax) * (high ? .45 : .2);
+        var p = Clamp(basis + adj, .05, .95);
+
         s.Current = new GameEvent
         {
             Title = "Pênalti!",
@@ -907,12 +921,52 @@ public sealed partial class GameEngine
                     SuccessText = "Gol! A rede balança e o estádio explode.",
                     Success = new Fx { Goals = 1, Fame = 3, Morale = 6 },
                     Chance = p,
-                    FailText = "O goleiro adivinhou o canto, ou a bola bateu na trave.",
+                    FailText = "O goleiro adivinhou o canto e fez a defesa.",
                     Fail = new Fx { Morale = -8, Fame = -2 }
                 }
             }
         };
         Pick(0);
+
+        // Como a bola terminou e para onde o goleiro pulou, para a animação do app.
+        var r = s.LastResult!;
+        string outcome;
+        int keeper;
+        if (r.Success)
+        {
+            outcome = "goal";
+            // Goleiro vai para o outro lado (ou fica no meio, às vezes, num chute de canto).
+            var col = i % 3;
+            var keeperCol = col == 1 ? (Rand() < .5 ? 0 : 2) : Rand() < .7 ? 2 - col : 1;
+            keeper = keeperCol + 3 * R(0, 1);
+        }
+        else
+        {
+            var outChance = power > PenaltyPowerMax ? (power - PenaltyPowerMax) / (100.0 - PenaltyPowerMax) * (high ? .85 : .4) : 0;
+            if (Rand() < outChance)
+            {
+                outcome = "out";
+                r.Text = high
+                    ? "Forte demais: a bola subiu e foi por cima do travessão."
+                    : "Forte demais: a bola saiu raspando a trave, pela linha de fundo.";
+                keeper = R(0, 5);
+            }
+            else if (Rand() < .15)
+            {
+                outcome = "post";
+                r.Text = "A bola explode na trave e volta para o campo!";
+                keeper = R(0, 5);
+            }
+            else
+            {
+                outcome = "save";
+                r.Text = power < PenaltyPowerMin
+                    ? "Fraca demais: o goleiro foi no canto e segurou firme."
+                    : "O goleiro adivinhou o canto e fez a defesa.";
+                keeper = i;
+            }
+        }
+        r.Penalty = new PenaltyShot { Zone = i, Power = power, Outcome = outcome, KeeperZone = keeper };
     }
 
     // ------------------------------------------------------------------ copas
@@ -1037,6 +1091,7 @@ public enum ActionType
     Retire
 }
 
-public record GameAction(ActionType Type, int? Index = null);
+/// <param name="Power">Força da barra no pênalti (0 a 100).</param>
+public record GameAction(ActionType Type, int? Index = null, int? Power = null);
 
 public sealed class GameRuleException(string message) : Exception(message);

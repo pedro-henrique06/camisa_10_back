@@ -56,7 +56,7 @@ fila de eventos do dia, copa em andamento etc.) e a **fase** atual, que diz qual
 | --- | --- | --- |
 | `Calendar` | calendário antes do dia | `Continue` |
 | `Event` | evento com opções | `Choose` (índice da opção) |
-| `Penalty` | cobrança de pênalti | `Choose` (0 a 5, ponto do gol) |
+| `Penalty` | cobrança de pênalti | `Choose` (0 a 5, canto do gol) com `power` (0 a 100, força da barra) |
 | `Result` | resultado da escolha | `Continue` |
 | `Market` | janela de transferências | `Choose` (proposta) ou `Stay` |
 | `Swap` | treinador sugere mudar de posição | `Choose` (0 aceita, 1 recusa) |
@@ -70,6 +70,13 @@ Com a janela aberta, `SearchClub` abre o mercado a partir do calendário, de um 
 Toda ação leva a `version` da tela que o app estava mostrando. Se não bater (toque duplo, duas abas),
 a API responde `409` com a tela atual e não aplica nada. A versão também é token de concorrência do EF.
 
+### Pênalti
+
+O jogador escolhe o canto (0 a 2 em cima, 3 a 5 embaixo) e para a barra de força.
+Entre 60 e 85 é a força ideal; fraca demais facilita a defesa e forte demais pode isolar a bola,
+principalmente nos cantos altos. O resultado traz `penalty` com o desfecho (`goal`, `save`, `post`
+ou `out`) e o canto para onde o goleiro pulou, para o app animar a cobrança.
+
 ## API
 
 Todas as rotas de carreira exigem o cabeçalho `X-Player-Id` (8 a 64 caracteres; o app gera um na primeira vez).
@@ -80,7 +87,7 @@ Todas as rotas de carreira exigem o cabeçalho `X-Player-Id` (8 a 64 caracteres;
 | GET | `/api/careers?status=Active` | carreiras do jogador (`Active` ou `Finished`) |
 | POST | `/api/careers` | nova carreira `{ name, club, nation, position }` |
 | GET | `/api/careers/{id}` | tela atual |
-| POST | `/api/careers/{id}/actions` | `{ type, index?, version }` e devolve a nova tela |
+| POST | `/api/careers/{id}/actions` | `{ type, index?, power?, version }` e devolve a nova tela |
 | GET | `/api/careers/{id}/history` | evolução temporada a temporada |
 | DELETE | `/api/careers/{id}` | apaga a carreira |
 
