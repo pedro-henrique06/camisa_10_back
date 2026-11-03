@@ -159,4 +159,13 @@ public record ClubOption(string Name, int Tier, Badge Badge);
 
 public record NationOption(string Name, string Flag);
 
-public record MetaView(IReadOnlyList<ClubOption> BaseClubs, IReadOnlyList<NationOption> Nations, IReadOnlyList<string> Positions);
+public record WeightView(string Key, string Name, int Percent);
+
+/// <summary>Posição com sigla, descrição e quanto cada atributo pesa no overall.</summary>
+public record PositionOption(string Name, string Short, string Description, IReadOnlyList<WeightView> Weights);
+
+public record MetaView(
+    IReadOnlyList<ClubOption> BaseClubs,
+    IReadOnlyList<NationOption> Nations,
+    IReadOnlyList<string> Positions,
+    IReadOnlyList<PositionOption> PositionInfo);

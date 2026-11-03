@@ -101,6 +101,17 @@ public static class GameData
 
     public static readonly string[] Positions = { "Atacante", "Ponta", "Meia", "Volante", "Lateral", "Zagueiro" };
 
+    /// <summary>Sigla e descrição curta de cada posição, para a tela de escolha.</summary>
+    public static readonly Dictionary<string, (string Short, string Description)> PositionInfo = new()
+    {
+        ["Atacante"] = ("ATA", "Vive dentro da área. Finaliza, decide jogos e vive de gols."),
+        ["Ponta"] = ("PON", "Corre pelos lados, dribla o lateral e cruza ou corta para dentro."),
+        ["Meia"] = ("MEI", "O cérebro do time: passes, assistências e visão de jogo."),
+        ["Volante"] = ("VOL", "Protege a defesa, rouba bolas e inicia as jogadas."),
+        ["Lateral"] = ("LAT", "Defende e apoia pelos lados, com fôlego para ir e voltar."),
+        ["Zagueiro"] = ("ZAG", "Último homem: desarmes, jogo aéreo e liderança na defesa.")
+    };
+
     /// <summary>Peso de cada atributo no overall, por posição (rit, chu, pas, dri, def, fis).</summary>
     public static readonly Dictionary<string, Dictionary<string, double>> Weights = new()
     {

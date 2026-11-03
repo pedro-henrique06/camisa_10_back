@@ -119,4 +119,19 @@ public class GameSimulationTests
         foreach (var id in GameData.Personal.Concat(GameData.Training).Concat(GameData.ArcStarts))
             Assert.Contains(Events.All, e => e.Id == id);
     }
+
+    [Fact]
+    public void Meta_traz_pesos_de_cada_posicao()
+    {
+        var meta = ViewBuilder.Meta();
+        Assert.Equal(GameData.Positions.Length, meta.PositionInfo.Count);
+        foreach (var p in meta.PositionInfo)
+        {
+            Assert.False(string.IsNullOrWhiteSpace(p.Description));
+            Assert.InRange(p.Weights.Sum(w => w.Percent), 99, 101);
+            Assert.True(p.Weights.Zip(p.Weights.Skip(1)).All(x => x.First.Percent >= x.Second.Percent), "ordenado do maior peso");
+        }
+        Assert.Equal("chu", meta.PositionInfo.First(p => p.Name == "Atacante").Weights[0].Key);
+        Assert.Equal("def", meta.PositionInfo.First(p => p.Name == "Zagueiro").Weights[0].Key);
+    }
 }

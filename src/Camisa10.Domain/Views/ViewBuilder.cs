@@ -225,7 +225,16 @@ public static class ViewBuilder
     public static MetaView Meta() => new(
         GameData.BaseClubs.Select(c => new ClubOption(c.Club, c.Tier, BadgeFor(c.Club))).ToList(),
         GameData.Nations.Select(n => new NationOption(n.Nation, n.Flag)).ToList(),
-        GameData.Positions);
+        GameData.Positions,
+        GameData.Positions.Select(p => new PositionOption(
+            p,
+            GameData.PositionInfo[p].Short,
+            GameData.PositionInfo[p].Description,
+            GameData.WeightsFor(p)
+                .Where(w => w.Value > 0)
+                .OrderByDescending(w => w.Value)
+                .Select(w => new WeightView(w.Key, GameData.AttributeNames[w.Key], (int)Math.Round(w.Value * 100)))
+                .ToList())).ToList());
 
     // ------------------------------------------------------------------ escudos (badge)
     public static Badge BadgeFor(string club)
