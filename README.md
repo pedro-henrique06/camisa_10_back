@@ -91,16 +91,24 @@ por acesso ou rebaixamento recente; para corrigir, edite a lista e regere:
 - **Propostas**: de clubes do mundo inteiro com o nível parecido, com mais chance para o próprio país, a mesma
   confederação, ligas fortes e clubes reais.
 - **Temporada em datas do ano** (`SeasonCalendar.cs`, `GameEngine.Competitions.cs`): 24 datas por temporada,
-  no máximo um jogo por data. Dois calendários:
+  no máximo um jogo por data (12 da liga, ou 7 da liga e 5 do estadual; 5 da copa nacional; 7 da continental).
+  As datas seguem os calendários oficiais de 2025/26 e 2026:
 
   | Calendário | Países | Período | Como se espalha |
   |---|---|---|---|
-  | `ano` | América do Sul, EUA, Canadá, Japão, Coreia, China, nórdicos… | janeiro a dezembro | estadual jan–mar, liga mar–dez, copa nacional fev–nov, continental abr–nov; janelas jan–mar e julho |
-  | `europeu` | o resto | agosto a maio | liga o ano todo, continental set–mai, copa nacional out–mai; janelas agosto e janeiro |
+  | `ano` | América do Sul | janeiro a dezembro | CBF 2026: estaduais 11/jan–8/mar, Série A 28/jan–2/dez, Copa do Brasil até a final de 6/dez; Libertadores com grupos em abr–mai, oitavas em ago, quartas em set, semi em out e final em 28/nov |
+  | `europeu` | Europa (exceto os abaixo), África, Oriente Médio e o resto da Ásia | agosto a maio | Champions 2025/26: fase de liga set–jan, oitavas mar, quartas abr, semi abr–mai, final 30/mai; copa nacional de out à final de maio |
+  | `inverno` | Rússia, Ucrânia e Japão (J.League 2026/27) | julho a maio | pausa de inverno de dezembro ao fim de fevereiro |
+  | `nordico` | Noruega, Suécia, Finlândia, Islândia, Irlanda, bálticos, Bielorrússia, Cazaquistão | março a dezembro | Eliteserien 2026: 14/mar–6/dez; nada em janeiro e fevereiro |
+  | `asia` | Coreia do Sul e China | fevereiro a dezembro | K League 2026: 28/fev–6/dez |
+  | `oceania` | Austrália e OFC | julho a maio | Australia Cup jul–out, A-League de outubro à grande final em maio |
+  | `concacaf` | CONCACAF | julho a maio | Liga MX (Apertura e Clausura) e MLS a partir de 2027/28; Champions Cup de fevereiro à final de 30/mai |
 
   Estadual (Paulistão, Carioca, Mineiro, Gauchão…) só no Brasil; sem ele, essas datas são rodadas da liga.
   Copa nacional (Copa do Brasil, FA Cup, Copa do Rei…): 5 fases, da terceira fase à final. Continental
-  (Libertadores, Liga dos Campeões…): 3 jogos de grupo e mata-mata das oitavas à final.
+  (Libertadores, Liga dos Campeões…): 3 jogos de grupo e mata-mata das oitavas à final. Nos calendários
+  nórdico, asiático e da Oceania, a copa continental (que na vida real atravessa duas temporadas) cabe
+  dentro da temporada do clube.
 - **Jogo ao vivo** (`GameEngine.Match.cs`): cada jogo tem adversário da competição, mando, placar e narração
   minuto a minuto. Entre as decisões do jogador, o jogo é simulado pela força dos times; a decisão muda o
   placar (gol, assistência, defesa, pênalti) e, na copa, define o resultado. O app mostra o campo com os
