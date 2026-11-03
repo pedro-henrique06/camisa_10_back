@@ -263,6 +263,8 @@ public class MatchState
     public int Turn { get; set; }
     public string Kind { get; set; } = "league";
     public string Competition { get; set; } = "";
+    /// <summary>Time do jogador quando não é o clube (seleção).</summary>
+    public string? Team { get; set; }
     public string Opponent { get; set; } = "";
     public int OpponentTier { get; set; }
     public bool Home { get; set; }

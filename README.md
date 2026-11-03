@@ -113,6 +113,9 @@ por acesso ou rebaixamento recente; para corrigir, edite a lista e regere:
   minuto a minuto. Entre as decisões do jogador, o jogo é simulado pela força dos times; a decisão muda o
   placar (gol, assistência, defesa, pênalti) e, na copa, define o resultado. O app mostra o campo com os
   jogadores correndo atrás da bola e a barra de narração.
+  Os torneios da seleção (Copa do Mundo, Copa América, Eurocopa…) também têm o campo: o adversário é uma
+  seleção da confederação (ou uma forte, na Copa do Mundo), com as cores das camisas e a narração com os
+  artigos certos ("da França", "de Portugal", "dos EUA"; ver `PtNames.cs`).
   A vaga continental sai da posição na liga anterior (no Brasil: 6 na Libertadores e 6 na Sul-Americana);
   recém-promovidos ficam de fora. Eliminado, o resto da copa some do calendário. Lesionado, o time joga sem
   você. Seleções: as 211, com Copa do Mundo a cada 4 temporadas e o torneio continental de cada confederação

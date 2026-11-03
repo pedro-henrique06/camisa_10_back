@@ -110,13 +110,13 @@ public static class ViewBuilder
     {
         if (ev.CompetitionId != null && s.Competitions.FirstOrDefault(c => c.Kind == ev.CompetitionId) is { } comp)
             return new CompetitionView(comp.Name, GameEngine.StageName(comp), comp.Kind);
+        if (s.Cup is { On: true } && GameEngine.IsCupEvent(ev) && ev.CompetitionId == null)
+            return new CompetitionView(s.Cup.Name, s.Cup.National ? "Seleção " + s.Nation : "Torneio", s.Cup.National ? "national" : "cup");
         if (ev.IsMatch)
         {
             var (name, sub) = League(s);
             return new CompetitionView(name, sub, "league");
         }
-        if (s.Cup != null && GameEngine.IsCupEvent(ev))
-            return new CompetitionView(s.Cup.Name, s.Cup.National ? "Seleção " + s.Nation : "Torneio", s.Cup.National ? "national" : "cup");
         return null;
     }
 
@@ -147,8 +147,11 @@ public static class ViewBuilder
         var m = s.Match!;
         mark = Math.Clamp(mark, 0, m.Feed.Count);
         var start = mark > 0 ? m.Feed[mark - 1] : null;
-        var team = s.Base ? GameEngine.CleanClub(s.Club) + " sub-20" : s.Club;
-        return new MatchView(team, m.Opponent, BadgeFor(s.Club), BadgeFor(m.Opponent.Replace(" sub-20", "")), m.Home, m.Kind, m.Competition,
+        var national = m.Kind == "national";
+        var team = m.Team ?? (s.Base ? GameEngine.CleanClub(s.Club) + " sub-20" : s.Club);
+        var teamBadge = national ? NationBadge(team) : BadgeFor(s.Club);
+        var oppBadge = national ? NationBadge(m.Opponent) : BadgeFor(m.Opponent.Replace(" sub-20", ""));
+        return new MatchView(team, m.Opponent, teamBadge, oppBadge, m.Home, m.Kind, m.Competition,
             start?.For ?? 0, start?.Against ?? 0, m.Feed.Skip(mark).ToList(), focus, m.Final, s.Position);
     }
 
@@ -297,6 +300,30 @@ public static class ViewBuilder
                 .ToList())).ToList());
 
     // ------------------------------------------------------------------ escudos (badge)
+    /// <summary>Cores das camisas das principais seleções (as outras usam a cor do nome).</summary>
+    private static readonly Dictionary<string, (string Primary, string Secondary)> NationColors = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["Brasil"] = ("#f7d117", "#009c3b"), ["Argentina"] = ("#75aadb", "#ffffff"), ["França"] = ("#1f3f8f", "#ffffff"),
+        ["Alemanha"] = ("#f2f2f2", "#111111"), ["Espanha"] = ("#c60b1e", "#ffc400"), ["Inglaterra"] = ("#f2f2f2", "#cf081f"),
+        ["Portugal"] = ("#c8102e", "#006600"), ["Itália"] = ("#0066b3", "#ffffff"), ["Holanda"] = ("#ff6f00", "#ffffff"),
+        ["Uruguai"] = ("#5cb3ff", "#111111"), ["Bélgica"] = ("#c8102e", "#111111"), ["Croácia"] = ("#e0322d", "#ffffff"),
+        ["México"] = ("#006847", "#ffffff"), ["EUA"] = ("#1d2f6f", "#ffffff"), ["Japão"] = ("#0b2e8a", "#ffffff"),
+        ["Marrocos"] = ("#c1272d", "#006233"), ["Colômbia"] = ("#fcd116", "#003893"), ["Chile"] = ("#d52b1e", "#ffffff"),
+        ["Senegal"] = ("#00853f", "#fdef42"), ["Equador"] = ("#ffd100", "#034ea2"), ["Paraguai"] = ("#d52b1e", "#ffffff"),
+        ["Peru"] = ("#ffffff", "#d91023"), ["Coreia do Sul"] = ("#c60c30", "#ffffff"), ["Austrália"] = ("#ffcd00", "#00843d"),
+        ["Suíça"] = ("#d52b1e", "#ffffff"), ["Dinamarca"] = ("#c60c30", "#ffffff"), ["Nigéria"] = ("#008751", "#ffffff"),
+        ["Gana"] = ("#ffffff", "#006b3f"), ["Camarões"] = ("#007a5e", "#fcd116"), ["Polônia"] = ("#ffffff", "#dc143c"),
+        ["Suécia"] = ("#fecc00", "#006aa7"), ["Escócia"] = ("#1c2d5a", "#ffffff"), ["Sérvia"] = ("#c6363c", "#ffffff"),
+        ["Canadá"] = ("#d52b1e", "#ffffff"), ["Arábia Saudita"] = ("#ffffff", "#006c35"), ["Irã"] = ("#ffffff", "#239f40")
+    };
+
+    /// <summary>Escudo da seleção: as cores da camisa e as iniciais do país.</summary>
+    public static Badge NationBadge(string country)
+    {
+        var b = BadgeFor(country);
+        return NationColors.TryGetValue(country, out var c) ? b with { Primary = c.Primary, Secondary = c.Secondary } : b;
+    }
+
     public static Badge BadgeFor(string club)
     {
         var n = GameEngine.CleanClub(club ?? "");
