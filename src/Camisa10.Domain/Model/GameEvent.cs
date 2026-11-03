@@ -16,10 +16,13 @@ public class GameEvent
     public bool IsPenalty { get; set; }
     /// <summary>Ilustração: "trophy" ou "ball".</summary>
     public string? Visual { get; set; }
+    /// <summary>Jogo de copa: a competição (Kind em <see cref="Competition"/>) a que o jogo pertence.</summary>
+    public string? CompetitionId { get; set; }
 
     public GameEvent Clone() => new()
     {
         EventId = EventId,
+        CompetitionId = CompetitionId,
         Title = Title,
         Text = Text,
         IsMatch = IsMatch,

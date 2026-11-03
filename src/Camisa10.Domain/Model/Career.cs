@@ -95,6 +95,8 @@ public class Career
     public bool NationalCupDone { get; set; }
     public bool BallonCheckDone { get; set; }
     public CupState? Cup { get; set; }
+    /// <summary>Competições do clube na temporada (liga, estadual, copa nacional e continental), com as datas dos jogos.</summary>
+    public List<Competition> Competitions { get; set; } = new();
 
     // ----- Estatísticas -----
     public int SeasonGoals { get; set; }
@@ -231,6 +233,34 @@ public class CupState
     public bool National { get; set; }
 }
 
+/// <summary>Uma competição do clube na temporada, com os dias dos jogos (1 a 20).</summary>
+public class Competition
+{
+    /// <summary>"league", "state" (estadual), "cup" (copa nacional) ou "continental".</summary>
+    public string Kind { get; set; } = "";
+    public string Name { get; set; } = "";
+    public List<int> Days { get; set; } = new();
+    /// <summary>Jogos de fase de grupos antes do mata-mata (0 = só mata-mata).</summary>
+    public int GroupGames { get; set; }
+    public int Played { get; set; }
+    public int Points { get; set; }
+    public bool Out { get; set; }
+    public bool Champion { get; set; }
+    /// <summary>Ajuste na chance de vencer (estadual é mais fácil, continental mais difícil).</summary>
+    public double Bonus { get; set; }
+    /// <summary>Como terminou: "Campeão", "Fase de grupos", "Quartas"...</summary>
+    public string? Result { get; set; }
+}
+
+/// <summary>Resultado de uma copa no balanço da temporada.</summary>
+public class CompetitionResult
+{
+    public string Kind { get; set; } = "";
+    public string Name { get; set; } = "";
+    public string Result { get; set; } = "";
+    public bool Champion { get; set; }
+}
+
 public class SeasonRecord
 {
     public int Age { get; set; }
@@ -336,4 +366,6 @@ public class SeasonReport
     /// <summary>"up" (acesso), "down" (rebaixamento) ou nulo.</summary>
     public string? Movement { get; set; }
     public List<TableRow> Table { get; set; } = new();
+    /// <summary>Copas da temporada (estadual, copa nacional, continental).</summary>
+    public List<CompetitionResult> Cups { get; set; } = new();
 }

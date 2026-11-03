@@ -60,7 +60,8 @@ public record HudView(
     IReadOnlyList<string> Warnings,
     bool CanSearchClub);
 
-public record CompetitionView(string Name, string Subtitle);
+/// <summary>Barra da competição. Kind: league, state, cup, continental ou national (cor no app).</summary>
+public record CompetitionView(string Name, string Subtitle, string Kind);
 
 public record RoutineView(string Club, Badge ClubBadge, int Sessions, string Focus, string FocusName);
 
@@ -88,11 +89,15 @@ public record DiceView(string Attribute, string AttributeName, int Value, int Mo
 
 public record ResultView(string Title, string Chosen, string Text, bool Success, DiceView? Dice, IReadOnlyList<Chip> Chips, string? Anim, PenaltyShot? Penalty);
 
-public record CalendarCell(int Day, bool Done, bool Match, bool Window);
+/// <summary>Dia do calendário. <see cref="Kind"/> é a competição do jogo do dia (league, state, cup, continental).</summary>
+public record CalendarCell(int Day, bool Done, bool Match, bool Window, string? Kind, string? Competition);
+
+/// <summary>Legenda do calendário: uma competição da temporada e como ela está.</summary>
+public record CompetitionLegend(string Kind, string Name, string Status, bool Out, bool Champion, int Games);
 
 public record DateChip(int Offset, string Weekday, int Day, string Month, string Icon);
 
-public record AgendaItem(string Icon, string Title, string Detail);
+public record AgendaItem(string Icon, string Title, string Detail, string? Kind = null);
 
 public record CalendarView(
     int DayDone,
@@ -102,7 +107,8 @@ public record CalendarView(
     IReadOnlyList<DateChip> Strip,
     int StripFrom,
     int StripTo,
-    IReadOnlyList<AgendaItem> Agenda);
+    IReadOnlyList<AgendaItem> Agenda,
+    IReadOnlyList<CompetitionLegend> Competitions);
 
 public record OfferView(
     int Index,

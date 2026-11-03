@@ -161,7 +161,7 @@ public sealed partial class GameEngine
             Next(); return;
         }
 
-        if (s.SeasonDay >= 20)
+        if (s.SeasonDay >= SeasonDays)
         {
             if (!s.NationalCupDone && !s.Base && s.Season % 2 == 0 && s.Age >= 19 && (s.Has("sel") || s.Overall >= 72))
             {
@@ -170,8 +170,6 @@ public sealed partial class GameEngine
                 StartCup(NationalCupName(), NationalStrength(), true);
                 return;
             }
-            var cn = ClubCupName();
-            if (cn != null && !s.Base && !s.CupDone) { s.CupDone = true; StartCup(cn, null, false); return; }
             if (!s.BallonCheckDone && !s.Base && s.Age >= 21 && s.Tier >= 3 && s.Overall >= 85 && s.Fame >= 60 && s.Titles >= 1)
             {
                 s.BallonCheckDone = true;
@@ -198,7 +196,7 @@ public sealed partial class GameEngine
             Market("ev");
             return;
         }
-        if (s.SeasonDay == 8 && s.Season % 3 == 0 && s.Age >= 20) { Swap(); return; }
+        if (s.SeasonDay == 8 && s.Season % 3 == 0 && s.Age >= 20) { s.Queue.Clear(); QueueCupGames(); Swap(); return; }
 
         GameEvent? personal = PickFromPool(id => GameData.Personal.Contains(id));
         GameEvent? training = PickFromPool(id => GameData.Training.Contains(id));
@@ -245,6 +243,8 @@ public sealed partial class GameEngine
             foreach (var p in plays) p.IsMatch = true;
             s.Queue.AddRange(plays);
         }
+        // Estadual, copa nacional e continental nos dias marcados.
+        QueueCupGames();
 
         GameEvent next;
         if (personal != null) next = personal;
@@ -298,9 +298,11 @@ public sealed partial class GameEngine
         if (d.IsEmpty()) d.Morale = ok ? 1 : -1;
 
         _ctx = cur.Title + " " + o.Label + " " + text;
+        _cupTarget = cur.CompetitionId;
         var before = Snapshot();
         var applied = Apply(d);
         _ctx = "";
+        _cupTarget = null;
         Trait(d, applied.SkillDelta, pr);
 
         if (ck != null) ck.Roll = roll;
@@ -436,9 +438,18 @@ public sealed partial class GameEngine
             s.Ballons++;
             s.Headlines.Add(s.Name + " é eleito o melhor do mundo");
         }
-        if (d.CupWin is > 0 && s.Cup != null) { if (s.Cup.Round < 0) s.Cup.Points += 3; s.Cup.Round++; }
-        if (d.CupDraw is > 0 && s.Cup != null) { s.Cup.Points += R(0, 1); s.Cup.Round++; }
-        if (d.CupLose is > 0 && s.Cup != null) s.Cup.On = false;
+        if (CompetitionOf(_cupTarget) is { } comp)
+        {
+            if (d.CupWin is > 0) CupOutcome(comp, 1);
+            else if (d.CupDraw is > 0) CupOutcome(comp, 0);
+            else if (d.CupLose is > 0) CupOutcome(comp, -1);
+        }
+        else
+        {
+            if (d.CupWin is > 0 && s.Cup != null) { if (s.Cup.Round < 0) s.Cup.Points += 3; s.Cup.Round++; }
+            if (d.CupDraw is > 0 && s.Cup != null) { s.Cup.Points += R(0, 1); s.Cup.Round++; }
+            if (d.CupLose is > 0 && s.Cup != null) s.Cup.On = false;
+        }
         if (d.NewClub != null)
         {
             var target = World.World.Club(d.NewClubId) ?? World.World.ClubByName(d.NewClub);
@@ -609,6 +620,7 @@ public sealed partial class GameEngine
         s.Club = s.BaseClub;
         s.ClubId = s.BaseClubId ?? s.ClubId;
         RefreshClub();
+        if (s.Season > 0) BuildCompetitions();
         s.Contract = 3;
         s.Salary = Math.Max(3, Round(SalaryFor(s.Tier) * .25));
     }
@@ -638,6 +650,7 @@ public sealed partial class GameEngine
         s.SeasonStartOverall = s.Overall;
         // acesso e rebaixamento da temporada anterior mudam a divisão (e o nível) do clube
         RefreshClub();
+        BuildCompetitions();
         s.CupDone = false;
         s.NationalCupDone = false;
         s.BallonCheckDone = false;
@@ -720,7 +733,8 @@ public sealed partial class GameEngine
             Rank = league?.Rank ?? 0,
             LeagueSize = league?.Size ?? 0,
             Movement = league?.Movement,
-            Table = league?.Table ?? new List<TableRow>()
+            Table = league?.Table ?? new List<TableRow>(),
+            Cups = CupResults()
         };
         s.Phase = GamePhase.SeasonSummary;
     }
@@ -863,9 +877,9 @@ public sealed partial class GameEngine
     /// <summary>Volta sem sair do clube (back).</summary>
     private void Back()
     {
+        var phase = s.ReturnPhase ?? GamePhase.Calendar;
         ClearMarket();
-        s.Phase = s.ReturnPhase ?? GamePhase.Calendar;
-        s.ReturnPhase = null;
+        s.Phase = phase;
     }
 
     private void ClearMarket()

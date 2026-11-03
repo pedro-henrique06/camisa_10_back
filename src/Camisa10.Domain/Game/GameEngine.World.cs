@@ -24,6 +24,8 @@ public sealed partial class GameEngine
             if (byName == null && !s.Base && s.ClubId != null) s.Club = World.World.Club(s.ClubId)!.Name;
         }
         if (s.LeagueName == null) RefreshClub();
+        // carreiras salvas antes do calendário com copas
+        if (s.Competitions.Count == 0 && s.Season > 0) BuildCompetitions();
     }
 
     private static int StableSeed(string text)
@@ -91,6 +93,7 @@ public sealed partial class GameEngine
         s.ClubId = club.Id;
         s.Club = club.Name;
         RefreshClub();
+        if (s.Season > 0) BuildCompetitions();
     }
 
     public static string? CountryOf(string club)
@@ -103,25 +106,6 @@ public sealed partial class GameEngine
         World.World.Club(clubId) is { } c ? World.World.Country(c.CountryIso) : null;
 
     // ---------------------------------------------------------------- copas
-    /// <summary>Copa do fim da temporada, pela confederação, divisão e nível do clube.</summary>
-    public string? ClubCupName()
-    {
-        var country = CountryOfId(s.ClubId);
-        if (country == null || s.Tier == 0) return null;
-        var national = country.Iso == "BR" ? "Copa do Brasil" : "Copa " + country.Name;
-        if (s.Division > 0 || s.Tier == 1) return national;
-        var (main, second) = country.Confederation switch
-        {
-            "UEFA" => ("Liga dos Campeões", "Liga Europa"),
-            "CONMEBOL" => ("Libertadores", "Copa Sul-Americana"),
-            "CONCACAF" => ("Champions Cup da CONCACAF", national),
-            "AFC" => ("Liga dos Campeões da AFC", "AFC Champions League Two"),
-            "CAF" => ("Liga dos Campeões da CAF", "Copa das Confederações da CAF"),
-            _ => ("Liga dos Campeões da OFC", national)
-        };
-        return s.Tier >= 3 ? main : second;
-    }
-
     private string NationalCupName()
     {
         if (s.Season % 4 == 0) return "Copa do Mundo";
