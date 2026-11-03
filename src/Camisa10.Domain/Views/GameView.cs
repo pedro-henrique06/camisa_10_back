@@ -38,6 +38,11 @@ public record HudView(
     string Club,
     Badge ClubBadge,
     string ClubLine,
+    /// <summary>Liga atual (ex.: "Brasileirão Série B"); nulo na base.</summary>
+    string? League,
+    /// <summary>"A", "B" ou "C"; nulo na base.</summary>
+    string? Division,
+    string ClubCountryFlag,
     bool Captain,
     bool Base,
     int Contract,
@@ -101,6 +106,7 @@ public record CalendarView(
 
 public record OfferView(
     int Index,
+    string? ClubId,
     string Club,
     Badge ClubBadge,
     string Country,
@@ -109,7 +115,9 @@ public record OfferView(
     double Salary,
     double Fee,
     int Sessions,
-    string FocusName);
+    string FocusName,
+    string? League,
+    string? Division);
 
 public record MarketView(string Mode, string Intro, double ReleaseClause, IReadOnlyList<OfferView> Offers, string StayLabel);
 
@@ -155,9 +163,9 @@ public record HistoryView(
     IReadOnlyList<HistoryPoint> Seasons,
     IReadOnlyList<string> Headlines);
 
-public record ClubOption(string Name, int Tier, Badge Badge);
+public record ClubOption(string Id, string Name, int Tier, Badge Badge);
 
-public record NationOption(string Name, string Flag);
+public record NationOption(string Name, string Flag, string Confederation);
 
 public record WeightView(string Key, string Name, int Percent);
 
@@ -169,3 +177,17 @@ public record MetaView(
     IReadOnlyList<NationOption> Nations,
     IReadOnlyList<string> Positions,
     IReadOnlyList<PositionOption> PositionInfo);
+
+// ---------------------------------------------------------------- mundo (escolha de clube)
+
+public record LeagueSummary(int Division, string Letter, string Name, int Clubs);
+
+public record CountrySummary(string Iso, string Name, string Flag, string Confederation, double Quality, IReadOnlyList<LeagueSummary> Leagues);
+
+public record WorldClubView(string Id, string Name, int Tier, bool Fictional, Badge Badge);
+
+public record LeagueView(int Division, string Letter, string Name, IReadOnlyList<WorldClubView> Clubs);
+
+public record CountryView(string Iso, string Name, string Flag, string Confederation, IReadOnlyList<LeagueView> Leagues);
+
+public record ClubSearchResult(string Id, string Name, string Country, string Flag, string League, string Letter, int Tier, bool Fictional, Badge Badge);

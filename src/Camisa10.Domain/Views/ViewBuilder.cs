@@ -1,5 +1,6 @@
 using Camisa10.Domain.Game;
 using Camisa10.Domain.Model;
+using Camisa10.Domain.World;
 
 namespace Camisa10.Domain.Views;
 
@@ -38,7 +39,7 @@ public static class ViewBuilder
     {
         var window = !s.Base && GameEngine.WindowOpen(s.SeasonDay);
         var line = s.Club +
-                   (s.Base ? " · Sub-" + (s.Age <= 15 ? 15 : s.Age <= 17 ? 17 : 20) : " · contrato " + s.Contract + "a") +
+                   (s.Base ? " · Sub-" + (s.Age <= 15 ? 15 : s.Age <= 17 ? 17 : 20) : (s.LeagueName != null ? " · " + s.LeagueName : "") + " · contrato " + s.Contract + "a") +
                    (window ? " · janela aberta" : "") +
                    (s.Injury > 0 ? " · lesionado " + s.Injury + "d" : "");
         var values = new Dictionary<string, int>
@@ -52,7 +53,11 @@ public static class ViewBuilder
 
         return new HudView(
             s.Name, s.Age, s.Position, s.Nation, NationFlag(s.Nation), s.SeasonDay,
-            s.Club, BadgeFor(s.Club), line, s.Captain, s.Base, s.Contract, window, s.Injury,
+            s.Club, BadgeFor(s.Club), line,
+            s.Base ? null : s.LeagueName,
+            s.Base || s.LeagueName == null ? null : World.World.DivisionLetter(s.Division),
+            GameEngine.CountryOfId(s.ClubId ?? s.BaseClubId)?.Flag ?? "",
+            s.Captain, s.Base, s.Contract, window, s.Injury,
             s.Money, s.Salary, s.Overall,
             GameData.BarLabels.Select(b => new BarView(b.Key, b.Label, values[b.Key])).ToList(),
             AttributeViews(s),
@@ -116,9 +121,9 @@ public static class ViewBuilder
     private static (string Name, string Sub) League(Career s)
     {
         if (s.Base) return ("Campeonato de Base", "Categoria sub-" + (s.Age <= 16 ? 17 : 20));
-        var c = GameEngine.CountryOf(s.Club) ?? "";
+        var c = GameEngine.CountryOfId(s.ClubId)?.Name ?? GameEngine.CountryOf(s.Club) ?? "";
         var day = s.SeasonDay == 0 ? 5 : s.SeasonDay;
-        return (GameData.Leagues.GetValueOrDefault(c, "Campeonato nacional"), $"{c} · jogo {(int)Math.Ceiling(day / 5.0)} de 4");
+        return (s.LeagueName ?? "Campeonato nacional", $"{c} · jogo {(int)Math.Ceiling(day / 5.0)} de 4");
     }
 
     // ------------------------------------------------------------------ resultado
@@ -189,10 +194,13 @@ public static class ViewBuilder
         } + (s.ReleaseClause > 0 ? $". Sua multa rescisória: R$ {Fmt.Num(s.ReleaseClause)} mi" : "") + ".";
         var offers = s.MarketOffers.Select((x, i) =>
         {
-            var country = GameEngine.CountryOf(x.Club) ?? "";
+            var country = GameEngine.CountryOfId(x.ClubId);
             var r = GameEngine.RoutineFor(x.Club, x.Tier, false);
-            return new OfferView(i, x.Club, BadgeFor(x.Club), country, GameData.CountryFlags.GetValueOrDefault(country, ""),
-                x.SigningBonus, x.Salary, x.Fee, r.Sessions, r.FocusName);
+            var p = x.ClubId != null ? WorldSim.Layout(s.WorldSeed, Math.Max(1, s.Season), s.ClubSeasons).Of(x.ClubId) : null;
+            return new OfferView(i, x.ClubId, x.Club, BadgeFor(x.Club), country?.Name ?? GameEngine.CountryOf(x.Club) ?? "", country?.Flag ?? "",
+                x.SigningBonus, x.Salary, x.Fee, r.Sessions, r.FocusName,
+                p is { } pl ? World.World.Country(pl.Iso).Leagues[pl.Division].Name : null,
+                p is { } pd ? World.World.DivisionLetter(pd.Division) : null);
         }).ToList();
         return new MarketView(mode, intro, s.ReleaseClause, offers,
             mode == "bt" ? "Voltar sem sair do clube" : "Ficar e negociar aumento no " + s.Club);
@@ -223,8 +231,9 @@ public static class ViewBuilder
 
     // ------------------------------------------------------------------ dados para a tela inicial
     public static MetaView Meta() => new(
-        GameData.BaseClubs.Select(c => new ClubOption(c.Club, c.Tier, BadgeFor(c.Club))).ToList(),
-        GameData.Nations.Select(n => new NationOption(n.Nation, n.Flag)).ToList(),
+        FeaturedClubs(),
+        World.World.Countries.OrderByDescending(c => c.NationalStrength).ThenBy(c => c.Name)
+            .Select(c => new NationOption(c.Name, c.Flag, c.Confederation)).ToList(),
         GameData.Positions,
         GameData.Positions.Select(p => new PositionOption(
             p,
@@ -252,8 +261,65 @@ public static class ViewBuilder
         return new Badge(primary, secondary, initials);
     }
 
-    public static string NationFlag(string nation) =>
-        GameData.Nations.FirstOrDefault(n => n.Nation == nation).Flag ?? "";
+    public static string NationFlag(string nation) => World.World.CountryByName(nation)?.Flag ?? "";
+
+    /// <summary>Clubes em destaque na tela inicial (os grandes de antes das ligas do mundo).</summary>
+    private static List<ClubOption> FeaturedClubs() =>
+        GameData.BaseClubs
+            .Select(b => World.World.ClubByName(b.Club))
+            .Where(c => c != null)
+            .Select(c => ClubOptionFor(c!))
+            .ToList();
+
+    private static ClubOption ClubOptionFor(WorldClub c) =>
+        new(c.Id, c.Name, World.World.Tier(c.CountryIso, World.World.InitialDivision(c.Id), c.Prestige), BadgeFor(c.Name));
+
+    // ------------------------------------------------------------------ mundo (escolha de clube)
+    public static List<CountrySummary> Countries() =>
+        World.World.Countries
+            .OrderByDescending(c => c.Quality).ThenBy(c => c.Name)
+            .Select(c => new CountrySummary(c.Iso, c.Name, c.Flag, c.Confederation, c.Quality,
+                c.Leagues.Select(l => new LeagueSummary(l.Division, World.World.DivisionLetter(l.Division), l.Name, l.Clubs.Count)).ToList()))
+            .ToList();
+
+    public static CountryView? Country(string iso)
+    {
+        var c = World.World.Countries.FirstOrDefault(x => string.Equals(x.Iso, iso, StringComparison.OrdinalIgnoreCase));
+        if (c == null) return null;
+        return new CountryView(c.Iso, c.Name, c.Flag, c.Confederation,
+            c.Leagues.Select(l => new LeagueView(l.Division, World.World.DivisionLetter(l.Division), l.Name,
+                l.Clubs.Select(x => new WorldClubView(x.Id, x.Name, World.World.Tier(c.Iso, l.Division, x.Prestige), x.Fictional, BadgeFor(x.Name))).ToList())).ToList());
+    }
+
+    public static List<ClubSearchResult> SearchClubs(string query, int limit = 30)
+    {
+        var q = Normalize(query);
+        if (q.Length < 2) return new();
+        return World.World.AllClubs
+            .Where(c => Normalize(c.Name).Contains(q))
+            .Select(c => (Club: c, Div: World.World.InitialDivision(c.Id)))
+            .OrderBy(x => x.Club.Fictional)
+            .ThenBy(x => Normalize(x.Club.Name).StartsWith(q) ? 0 : 1)
+            .ThenByDescending(x => World.World.Strength(x.Club.CountryIso, x.Div, x.Club.Prestige))
+            .Take(limit)
+            .Select(x =>
+            {
+                var country = World.World.Country(x.Club.CountryIso);
+                return new ClubSearchResult(x.Club.Id, x.Club.Name, country.Name, country.Flag, country.Leagues[x.Div].Name,
+                    World.World.DivisionLetter(x.Div), World.World.Tier(country.Iso, x.Div, x.Club.Prestige), x.Club.Fictional, BadgeFor(x.Club.Name));
+            })
+            .ToList();
+    }
+
+    private static string Normalize(string s)
+    {
+        var d = s.Normalize(System.Text.NormalizationForm.FormD);
+        var sb = new System.Text.StringBuilder();
+        foreach (var ch in d)
+            if (System.Globalization.CharUnicodeInfo.GetUnicodeCategory(ch) != System.Globalization.UnicodeCategory.NonSpacingMark)
+                sb.Append(char.ToLowerInvariant(ch));
+        return sb.ToString();
+    }
 
     private static string HslToHex(double h, double s, double l)
     {

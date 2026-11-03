@@ -2,6 +2,7 @@ using Camisa10.Domain.Game;
 
 namespace Camisa10.Api.Endpoints;
 
+/// <param name="Club">Id do clube no mundo (de /api/world). O nome também é aceito.</param>
 public record NewCareerRequest(string? Name, string Club, string Nation, string Position);
 
 /// <summary>
