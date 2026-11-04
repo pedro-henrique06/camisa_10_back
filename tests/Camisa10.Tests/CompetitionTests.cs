@@ -169,6 +169,7 @@ public class CompetitionTests
             {
                 if (s.Phase != GamePhase.Event || s.Current?.CompetitionId is not { } kind) return;
                 var comp = s.Competitions.Single(c => c.Kind == kind);
+                if (comp.Sequential) return; // seleção: jogos em sequência depois da temporada
                 Assert.Contains(s.SeasonDay, comp.Days);
                 if (seen.LastOrDefault() != (s.Season, s.SeasonDay, kind)) seen.Add((s.Season, s.SeasonDay, kind));
             });
@@ -185,7 +186,7 @@ public class CompetitionTests
     {
         var (s, e) = Pro("Palmeiras");
         var lib = s.Competitions.Single(c => c.Kind == "continental");
-        // três derrotas na fase de grupos
+        // três derrotas na fase de grupos (jogo sem campo: o placar sai da decisão)
         for (var i = 0; i < 3; i++)
         {
             s.SeasonDay = lib.Days[i];
@@ -193,10 +194,9 @@ public class CompetitionTests
             {
                 CompetitionId = "continental",
                 Title = "jogo",
-                Options = { new EventOption { Label = "x", SuccessText = "x", Success = new Fx { CupDraw = 1 }, Chance = 1 } }
+                Options = { new EventOption { Label = "x", SuccessText = "x", Success = new Fx { CupLose = 1 }, Chance = 1 } }
             };
             s.Phase = GamePhase.Event;
-            lib.Points = 0;
             e.Act(new GameAction(ActionType.Choose, 0));
         }
         Assert.True(lib.Out);

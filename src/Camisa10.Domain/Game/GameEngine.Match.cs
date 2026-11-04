@@ -14,10 +14,12 @@ public sealed partial class GameEngine
     private const double GoalsPerGame = 1.25;
 
     /// <summary>Começa o jogo do dia e marca o minuto de cada lance.</summary>
-    private void StartMatch(string kind, string competition, List<GameEvent> plays, string? team = null, (string Id, bool Home)? fixture = null)
+    private void StartMatch(string kind, string competition, List<GameEvent> plays, string? team = null,
+        (string Id, bool Home)? fixture = null, (string Name, int Tier, bool Home)? opponent = null)
     {
-        var (opponent, tier) = fixture is { } f
+        var (opponentName, tier) = fixture is { } f
             ? (World.World.Club(f.Id)!.Name + (s.Base ? " sub-20" : ""), Layout().TierOf(f.Id))
+            : opponent is { } o ? (o.Name, o.Tier)
             : kind == "national" ? PickNationalOpponent(competition) : PickOpponent(kind);
         s.Match = new MatchState
         {
@@ -25,9 +27,9 @@ public sealed partial class GameEngine
             Team = team,
             Kind = kind,
             Competition = competition,
-            Opponent = opponent,
+            Opponent = opponentName,
             OpponentTier = tier,
-            Home = fixture?.Home ?? Rand() < .5
+            Home = fixture?.Home ?? opponent?.Home ?? Rand() < .5
         };
 
         var moments = plays.Where(p => p.Focus != "pre").ToList();
@@ -222,6 +224,9 @@ public sealed partial class GameEngine
             PlayLeagueRound(m.Round, (m.For, m.Against));
             Line(90, TableLine(), "info");
         }
+        // copa: grupo ou chave andam com o placar do jogo
+        if (m.Kind != "league" && CompetitionOf(m.Kind) is { } cup && !cup.Out && !cup.Champion)
+            CupResult(cup, m.For, m.Against);
         s.SeasonMatches.Add(new MatchRecord
         {
             Turn = m.Turn, Kind = m.Kind, Competition = m.Competition, Opponent = m.Opponent, Home = m.Home,

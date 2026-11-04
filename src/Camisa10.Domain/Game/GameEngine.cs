@@ -164,11 +164,12 @@ public sealed partial class GameEngine
 
         if (s.SeasonDay >= SeasonDays)
         {
+            if (NationalCupLive() is { } live) { PlayNationalGame(live); return; }
             if (!s.NationalCupDone && !s.Base && s.Season % 2 == 0 && s.Age >= 19 && (s.Has("sel") || s.Overall >= 72))
             {
                 s.NationalCupDone = true;
                 s.SetFlag("sel");
-                StartCup(NationalCupName(), NationalStrength(), true);
+                PlayNationalGame(StartNationalCup());
                 return;
             }
             if (!s.BallonCheckDone && !s.Base && s.Age >= 21 && s.Tier >= 3 && s.Overall >= 85 && s.Fame >= 60 && s.Titles >= 1)
@@ -315,6 +316,7 @@ public sealed partial class GameEngine
         _ctx = cur.Title + " " + o.Label + " " + text;
         _cupTarget = cur.CompetitionId;
         var live = MatchLive(cur);
+        _cupLive = live;
         var before = Snapshot();
         var applied = Apply(d);
         _ctx = "";
@@ -458,9 +460,14 @@ public sealed partial class GameEngine
         }
         if (CompetitionOf(_cupTarget) is { } comp)
         {
-            if (d.CupWin is > 0) CupOutcome(comp, 1);
-            else if (d.CupDraw is > 0) CupOutcome(comp, 0);
-            else if (d.CupLose is > 0) CupOutcome(comp, -1);
+            // jogo de copa sem campo (salvo antes do jogo ao vivo): o placar sai da decisão.
+            // Com o jogo ao vivo, o resultado vale no apito final (FinishMatch).
+            if (!_cupLive)
+            {
+                if (d.CupWin is > 0) CupResult(comp, 1, 0);
+                else if (d.CupDraw is > 0) CupResult(comp, 1, 1);
+                else if (d.CupLose is > 0) CupResult(comp, 0, 1);
+            }
         }
         else
         {

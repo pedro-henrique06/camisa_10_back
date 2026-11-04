@@ -17,6 +17,8 @@ public sealed partial class GameEngine
 
     /// <summary>Competição do jogo de copa que está sendo decidido (para aplicar vitória ou derrota).</summary>
     private string? _cupTarget;
+    /// <summary>O jogo de copa que está sendo decidido tem campo ao vivo (o resultado vale no apito final).</summary>
+    private bool _cupLive;
 
     /// <summary>
     /// Monta as competições do clube atual. Quem chega no meio da temporada (transferência)
@@ -52,13 +54,16 @@ public sealed partial class GameEngine
                 list.Add(new Competition { Kind = "continental", Name = cont, Days = SeasonCalendar.DaysOf(cal, "continental", true), GroupGames = 3, Bonus = -.06 });
         }
 
-        foreach (var c in list.Where(c => c.Kind != "league").ToList())
+        // o torneio da seleção em andamento continua (ele não depende do clube)
+        if (s.Competitions.FirstOrDefault(c => c.Kind == "national") is { } national && s.SeasonDay >= SeasonDays) list.Add(national);
+        s.Competitions = list;
+        foreach (var c in list.Where(c => c.Kind is not ("league" or "national")).ToList())
         {
+            c.KoRounds = c.Days.Count - c.GroupGames;
             c.Played = c.Days.Count(d => d <= s.SeasonDay);
             if (c.Played >= c.Days.Count) { list.Remove(c); continue; }
-            if (c.GroupGames > 0) c.Points = Math.Min(c.Played, c.GroupGames) * 2;
+            InitCup(c);
         }
-        s.Competitions = list;
         EnsureLeagueTable();
     }
 
@@ -74,22 +79,31 @@ public sealed partial class GameEngine
     {
         foreach (var c in CupsToday().ToList())
         {
+            if (c.Group.Count == 0 && c.Bracket.Count == 0) InitCup(c);
+            var opp = CupOpponent(c);
             if (s.Injury > 0)
             {
-                var win = Rand() < CupChance(c) - .05;
-                CupOutcome(c, win ? 1 : c.Played < c.GroupGames ? 0 : -1, true);
+                // sem o jogador, o placar sai da força dos dois times
+                var (gf, ga) = opp is { } o ? CupScore(c, MyCupId(c), o.Id) : (1, 0);
+                CupResult(c, gf, ga, true);
             }
             else
             {
                 var game = CupGame(c);
-                StartMatch(c.Kind, c.Name, new List<GameEvent> { game });
+                StartMatch(c.Kind, c.Name, new List<GameEvent> { game }, opponent: opp is { } o ? (o.Name, o.Tier, o.Home) : null);
                 s.Queue.Add(game);
             }
         }
     }
 
-    private double CupChance(Competition c) =>
-        (c.Played < c.GroupGames ? .3 : .25) + s.Tier * .06 + (s.Overall - 60) / 400.0 + c.Bonus;
+    private double CupChance(Competition c)
+    {
+        // força do time (nível do clube ou da seleção) e um ajuste pelo adversário do grupo ou da chave
+        var strength = c.Strength ?? s.Tier;
+        var opp = CupOpponent(c);
+        var edge = opp is { } o ? Math.Clamp(((c.Strength ?? s.Tier) - o.Tier) * .03, -.08, .08) : 0;
+        return (c.Played < c.GroupGames ? .3 : .25) + strength * .06 + (s.Overall - 60) / 400.0 + c.Bonus + edge;
+    }
 
     /// <summary>Nome da fase do próximo jogo (ou do jogo de índice <paramref name="index"/>).</summary>
     public static string StageName(Competition c, int? index = null)
@@ -97,7 +111,7 @@ public sealed partial class GameEngine
         var i = index ?? c.Played;
         if (c.Kind == "league") return $"Rodada {Math.Min(i + 1, c.Days.Count)} de {c.Days.Count}";
         if (i < c.GroupGames) return $"Fase de grupos, jogo {i + 1}";
-        var ko = c.Days.Count - c.GroupGames;
+        var ko = c.KoRounds > 0 ? c.KoRounds : c.Days.Count - c.GroupGames;
         var k = Math.Clamp(KnockoutStages.Length - ko + (i - c.GroupGames), 0, KnockoutStages.Length - 1);
         return KnockoutStages[k];
     }
@@ -132,51 +146,6 @@ public sealed partial class GameEngine
                 EventDef.O("Jogar seguro", "Você segura o resultado.", new Fx { CupWin = 1 }, b - .1, "Faltou ousadia e o time cai.", new Fx { Morale = -3, CupLose = 1 })
             });
         return ev;
-    }
-
-    /// <summary>
-    /// Resultado de um jogo de copa: 1 vitória, 0 empate (só na fase de grupos), -1 derrota.
-    /// Eliminação e título aparecem logo depois, como um evento.
-    /// </summary>
-    private void CupOutcome(Competition c, int outcome, bool withoutPlayer = false)
-    {
-        var group = c.Played < c.GroupGames;
-        if (!group && outcome < 0)
-        {
-            c.Out = true;
-            c.Result = StageName(c);
-            c.Days = c.Days.Take(c.Played + 1).ToList();
-            c.Played++;
-            if (withoutPlayer)
-                s.Queue.Insert(0, Notice("cupG", c.Name + ": eliminado", $"Sem você em campo, o time cai na {c.Result.ToLowerInvariant()}.", -3));
-            return;
-        }
-        if (group) c.Points += outcome > 0 ? 3 : outcome == 0 ? R(0, 1) : 0;
-        c.Played++;
-
-        if (group && c.Played == c.GroupGames && c.Points < 4)
-        {
-            c.Out = true;
-            c.Result = "Fase de grupos";
-            c.Days = c.Days.Take(c.Played).ToList();
-            s.Queue.Insert(0, Notice("cupG", c.Name + ": eliminado", "Seu time não passou da fase de grupos.", -4));
-            return;
-        }
-        if (c.Played == c.Days.Count)
-        {
-            c.Champion = true;
-            c.Result = "Campeão";
-            s.Titles++;
-            s.Headlines.Add(s.Name + " é campeão: " + c.Name);
-            s.Queue.Insert(0, new GameEvent
-            {
-                EventId = "cupW",
-                Title = c.Name + ": campeão!",
-                Text = withoutPlayer ? "Mesmo sem você em campo, o time é campeão e você sobe para levantar a taça." : "Você levanta a taça diante da torcida.",
-                Visual = "trophy",
-                Options = { new EventOption { Label = "Comemorar", SuccessText = "A festa vai até de manhã.", Success = new Fx { Fame = c.Kind == "state" ? 6 : 12, Morale = 12 } } }
-            });
-        }
     }
 
     private static GameEvent Notice(string id, string title, string text, int morale) => new()

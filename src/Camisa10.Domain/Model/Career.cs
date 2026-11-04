@@ -262,6 +262,38 @@ public class Competition
     public double Bonus { get; set; }
     /// <summary>Como terminou: "Campeão", "Fase de grupos", "Quartas"...</summary>
     public string? Result { get; set; }
+    /// <summary>Fases de mata-mata (oitavas a final = 4).</summary>
+    public int KoRounds { get; set; }
+    /// <summary>Torneio da seleção: força da seleção e jogos em sequência depois da temporada.</summary>
+    public double? Strength { get; set; }
+    public bool Sequential { get; set; }
+    /// <summary>Grupo do time do jogador (4 times; os 2 primeiros se classificam).</summary>
+    public string? GroupName { get; set; }
+    public List<LeagueRow> Group { get; set; } = new();
+    /// <summary>Chaveamento do mata-mata, fase por fase.</summary>
+    public List<BracketRound> Bracket { get; set; } = new();
+}
+
+/// <summary>Uma fase do mata-mata (ex.: "Quartas") e seus confrontos.</summary>
+public class BracketRound
+{
+    public string Name { get; set; } = "";
+    public List<BracketTie> Ties { get; set; } = new();
+}
+
+/// <summary>Confronto do mata-mata. Sem visitante = o mandante passa direto.</summary>
+public class BracketTie
+{
+    public string HomeId { get; set; } = "";
+    public string Home { get; set; } = "";
+    public string? AwayId { get; set; }
+    public string? Away { get; set; }
+    public int? HomeGoals { get; set; }
+    public int? AwayGoals { get; set; }
+    public string? WinnerId { get; set; }
+    /// <summary>Decidido nos pênaltis.</summary>
+    public bool Penalties { get; set; }
+    public bool Mine { get; set; }
 }
 
 /// <summary>Jogo em andamento: placar, adversário e o que o narrador já contou.</summary>

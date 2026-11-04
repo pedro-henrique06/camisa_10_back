@@ -76,6 +76,33 @@ public static class ViewBuilder
 
     private static int SeasonAssists(Career s) => s.SeasonMatches.Sum(x => x.Assists) + (LiveMatch(s)?.MyAssists ?? 0);
 
+    /// <summary>Grupo e chave de cada copa (as fases que faltam aparecem como "A definir").</summary>
+    private static List<CupView> Cups(Career s) => s.Competitions
+        .Where(c => c.Kind != "league" && (c.Group.Count > 0 || c.Bracket.Count > 0))
+        .Select(c =>
+        {
+            var group = GameEngine.Sorted(c.Group).Select((r, i) => new TableRow
+            {
+                Position = i + 1, Club = r.Club, Mine = i >= 0 && r.ClubId == c.Group[0].ClubId,
+                Zone = i < 2 ? "up" : null,
+                Played = r.Played, Won = r.Won, Drawn = r.Drawn, Lost = r.Lost,
+                GoalsFor = r.GoalsFor, GoalsAgainst = r.GoalsAgainst, Points = r.Points
+            }).ToList();
+            var current = c.Out || c.Champion ? -1 : c.Played - c.GroupGames;
+            var rounds = c.Bracket.Select((r, k) => new BracketRoundView(r.Name, k == current,
+                r.Ties.Select(t => new BracketTieView(t.Home, t.Away ?? (t.AwayId == null ? "folga" : null), t.HomeGoals, t.AwayGoals,
+                    t.WinnerId == null ? null : t.WinnerId == t.HomeId ? "home" : "away", t.Penalties, t.Mine)).ToList())).ToList();
+            // fases que ainda não têm confrontos
+            var ties = c.Bracket.Count > 0 ? c.Bracket[^1].Ties.Count : 1 << Math.Max(0, c.KoRounds - 1);
+            for (var k = c.Bracket.Count; k < c.KoRounds; k++)
+            {
+                ties = Math.Max(1, (ties + 1) / (k == 0 ? 1 : 2));
+                rounds.Add(new BracketRoundView(GameEngine.StageName(c, c.GroupGames + k), k == current,
+                    Enumerable.Range(0, ties).Select(_ => new BracketTieView("A definir", "A definir", null, null, null, false, false)).ToList()));
+            }
+            return new CupView(c.Kind, c.Name, LegendStatus(s, c), c.Out, c.Champion, c.GroupName, group, rounds);
+        }).ToList();
+
     /// <summary>Tabela ao vivo da liga, com zonas de acesso e rebaixamento.</summary>
     private static LiveTableView? LiveTable(Career s, GameEngine engine)
     {
@@ -253,7 +280,7 @@ public static class ViewBuilder
         return new CalendarView(a, b,
             (a > 0 ? $"{SeasonCalendar.Label(SeasonCalendar.At(cal, a))} concluído. " : "Início da temporada. ") + $"{games} jogos: {list}.",
             cells, strip, 1, strip.Count - 3, agenda, legend,
-            SeasonCalendar.Label(next), GameEngine.SeasonDays, LiveTable(s, engine),
+            SeasonCalendar.Label(next), GameEngine.SeasonDays, LiveTable(s, engine), Cups(s),
             $"Temporada de {SeasonCalendar.MonthNames[first.Month - 1]} a {SeasonCalendar.MonthNames[last.Month - 1]}");
     }
 

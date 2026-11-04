@@ -120,6 +120,16 @@ public record ResultView(string Title, string Chosen, string Text, bool Success,
 /// <summary>Dia do calendário. <see cref="Kind"/> é a competição do jogo do dia (league, state, cup, continental).</summary>
 public record CalendarCell(int Day, bool Done, bool Match, bool Window, string? Kind, string? Competition, int Month, int DayOfMonth, string MonthLabel);
 
+/// <summary>Uma copa: o grupo do time do jogador (os 2 primeiros passam) e a chave do mata-mata.</summary>
+public record CupView(string Kind, string Name, string Status, bool Out, bool Champion, string? GroupName,
+    IReadOnlyList<TableRow> Group, IReadOnlyList<BracketRoundView> Bracket);
+
+/// <summary>Fase do mata-mata. Current = a fase do próximo jogo do jogador. Fases futuras vêm com "A definir".</summary>
+public record BracketRoundView(string Name, bool Current, IReadOnlyList<BracketTieView> Ties);
+
+/// <summary>Confronto. Winner: "home", "away" ou nulo (ainda não jogado).</summary>
+public record BracketTieView(string Home, string? Away, int? HomeGoals, int? AwayGoals, string? Winner, bool Penalties, bool Mine);
+
 /// <summary>Tabela da liga durante a temporada.</summary>
 public record LiveTableView(string League, int Round, int Rounds, int Position, IReadOnlyList<TableRow> Rows, IReadOnlyList<MatchSummary> Recent);
 
@@ -148,6 +158,8 @@ public record CalendarView(
     int Total,
     /// <summary>Tabela da liga ao vivo e os últimos jogos.</summary>
     LiveTableView? Table,
+    /// <summary>Copas da temporada: grupo e chaveamento.</summary>
+    IReadOnlyList<CupView> Cups,
     /// <summary>Ex.: "Temporada de janeiro a dezembro".</summary>
     string SeasonSpan);
 
