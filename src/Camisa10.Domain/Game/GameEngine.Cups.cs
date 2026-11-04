@@ -102,7 +102,14 @@ public sealed partial class GameEngine
             {
                 // quem chega depois da fase de grupos chega com o time classificado
                 var sorted = Sorted(c.Group);
-                if (sorted.FindIndex(x => x.ClubId == me) > 1) c.Group[0].Points = sorted[1].Points + 1;
+                if (sorted.FindIndex(x => x.ClubId == me) > 1)
+                {
+                    // campanha de quem se classificou: vitória em todos os jogos (pontos batem com o resultado)
+                    var row = c.Group[0];
+                    row.Won = row.Played;
+                    row.Drawn = row.Lost = 0;
+                    row.Points = row.Won * 3;
+                }
                 StartBracket(c, pool);
             }
         }
@@ -229,6 +236,9 @@ public sealed partial class GameEngine
         if (k + 1 < c.KoRounds && c.Bracket.Count == k + 1)
         {
             var winners = c.Bracket[k].Ties.Select(t => t.WinnerId!).ToList();
+            // número ímpar de times (copa com poucos times): a folga fica com outro time, nunca com o do
+            // jogador, para ele ter adversário de verdade no jogo ao vivo
+            if (winners.Count % 2 == 1 && winners.Count > 1 && winners[^1] == me) (winners[^1], winners[^2]) = (winners[^2], winners[^1]);
             var next = new List<BracketTie>();
             for (var i = 0; i + 1 < winners.Count; i += 2) next.Add(NewTie(c, winners[i], winners[i + 1], me));
             if (winners.Count % 2 == 1) next.Add(NewTie(c, winners[^1], null, me));
