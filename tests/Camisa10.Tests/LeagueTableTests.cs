@@ -117,3 +117,22 @@ public class LeagueTableTests(ITestOutputHelper output)
         return (career, engine);
     }
 }
+
+public class TabsDataTests
+{
+    [Fact]
+    public void Calendario_e_tabela_vem_em_qualquer_fase_da_carreira()
+    {
+        var seen = new HashSet<GamePhase>();
+        GameSimulationTests.PlayToEnd(11, "Meia", "Santos", s =>
+        {
+            if (s.Status != CareerStatus.Active || s.Season == 0) return;
+            var v = ViewBuilder.Build(s);
+            Assert.NotNull(v.Calendar);
+            seen.Add(s.Phase);
+        });
+        Assert.Contains(GamePhase.Event, seen);
+        Assert.Contains(GamePhase.Result, seen);
+        Assert.Contains(GamePhase.SeasonSummary, seen);
+    }
+}

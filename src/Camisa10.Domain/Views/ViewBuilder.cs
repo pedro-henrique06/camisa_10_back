@@ -21,7 +21,8 @@ public static class ViewBuilder
             Hud(s, engine),
             s.Phase is GamePhase.Event or GamePhase.Penalty && s.Current != null ? Event(s, engine, s.Current) : null,
             s.Phase == GamePhase.Result && s.LastResult != null ? Result(s, s.LastResult) : null,
-            s.Phase == GamePhase.Calendar ? Calendar(s, engine) : null,
+            // calendário e tabela vão em todas as fases, para as abas do app (Calendário, Tabela)
+            s.Status == CareerStatus.Active && s.Season > 0 ? Calendar(s, engine) : null,
             s.Phase == GamePhase.Market ? Market(s) : null,
             s.Phase == GamePhase.Swap ? new SwapView(s.Position, s.SwapTarget ?? s.Position) : null,
             s.Phase == GamePhase.Promotion ? new PromotionView(s.Club, BadgeFor(s.Club)) : null,
