@@ -230,3 +230,24 @@ Os textos e números dos eventos vieram do `index.html` original do repositório
 Para regerar depois de editar o HTML:
 
     node tools/gen-events.js ../camisa-10/legacy/index.html
+
+> O script reescreve `Events.Generated.cs`. Depois de regerar, refaça o ajuste do cachorro (`cac`), que é adotado uma vez só e tem continuação.
+
+### Vida fora de campo por idade (`Events.Life.cs`)
+
+Os eventos de vida mudam com a fase da carreira:
+
+| Fase | Idade | Exemplos |
+|---|---|---|
+| Base | até 18 | prova na escola, saudade no alojamento, primeira chuteira, pelada no bairro, carteira de motorista |
+| Começo | 19 a 24 | morar sozinho, primeiro carro, primeiro salário, patrocínio de marca, reality show |
+| Auge | 25 a 30 | pedido de casamento, casamento, bebê, negócio próprio, instituto social, comercial de TV |
+| Veterano | 31 ou mais | aposentadoria, curso de treinador, comentarista de TV, mentor da base, biografia |
+
+- Os marcos da vida acontecem uma vez só (`Flag`). Alguns têm continuação (`FollowUp`): o casamento leva ao bebê, ao nascimento e ao filho no estádio.
+- No sorteio:
+  - o evento pessoal aparece em pouco mais da metade dos dias, não em todos;
+  - um evento pessoal só volta depois de 60 datas, cerca de 2,5 temporadas;
+  - os imprevistos (`GameData.Rare`: assalto, cano estourado, cachorro...) só voltam depois de 150 datas;
+  - os eventos da sua fase da vida e os que você ainda não viu têm mais chance.
+- Em 12 carreiras simuladas, cachorro, assalto, cano e "pai assessor" caíram de 34 aparições por carreira para 6. O evento mais repetido caiu de 17 para 6 vezes por carreira, e a variedade subiu de 56 para 97 eventos pessoais diferentes (`LifeEventsTests`).
