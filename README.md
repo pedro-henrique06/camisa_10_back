@@ -109,6 +109,13 @@ por acesso ou rebaixamento recente; para corrigir, edite a lista e regere:
   (Libertadores, Liga dos Campeões…): 3 jogos de grupo e mata-mata das oitavas à final. Nos calendários
   nórdico, asiático e da Oceania, a copa continental (que na vida real atravessa duas temporadas) cabe
   dentro da temporada do clube.
+- **Tabela ao vivo** (`GameEngine.League.cs`): a cada data da liga todos os clubes jogam uma rodada
+  (método do círculo, turno e returno). O jogo do jogador usa o placar do jogo ao vivo; os outros são
+  simulados pela força dos clubes. Posição final, título, acesso e rebaixamento saem dessa tabela, e a
+  classificação inteira é gravada para o mundo da temporada seguinte.
+- **Estatísticas dos jogos**: jogos, gols, assistências e nota do balanço são a soma das partidas do
+  jogador (parte dos gols do time é dele, pela posição; a nota de cada jogo vem dos gols, passes,
+  decisões e do resultado).
 - **Jogo ao vivo** (`GameEngine.Match.cs`): cada jogo tem adversário da competição, mando, placar e narração
   minuto a minuto. Entre as decisões do jogador, o jogo é simulado pela força dos times; a decisão muda o
   placar (gol, assistência, defesa, pênalti) e, na copa, define o resultado. O app mostra o campo com os

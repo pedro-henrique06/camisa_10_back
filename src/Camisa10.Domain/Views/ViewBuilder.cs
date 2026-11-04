@@ -260,7 +260,14 @@ public static class ViewBuilder
     private static string LegendStatus(Career s, Competition c)
     {
         if (c.Champion) return "Campeão";
-        if (c.Out) return "Eliminado" + (c.Result == "Fase de grupos" ? " na fase de grupos" : c.Result == "Final" ? " na final" : " nas " + c.Result!.ToLowerInvariant().Replace("semifinal", "semifinais"));
+        if (c.Out) return "Eliminado " + c.Result switch
+        {
+            "Oitavas" => "nas oitavas",
+            "Quartas" => "nas quartas",
+            "Semifinal" => "na semifinal",
+            "Final" => "na final",
+            var r => "na " + (r ?? "fase de grupos").ToLowerInvariant()
+        };
         if (c.Kind == "league")
         {
             var played = c.Days.Count(d => d <= s.SeasonDay);
