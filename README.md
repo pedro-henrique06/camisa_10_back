@@ -117,6 +117,16 @@ por acesso ou rebaixamento recente; para corrigir, edite a lista e regere:
   todos; os 2 primeiros passam) e mata-mata; copa nacional só mata-mata. A chave é inteira: o adversário de
   cada jogo do jogador sai dela, os outros jogos são simulados pela força dos times, e quem é eliminado vê a
   chave seguir até o campeão. Os torneios da seleção usam o mesmo formato (grupo e oitavas a final).
+- **Mesa com amigos** (`Model/Mesa.cs`, `GameEngine.Mesa.cs`, `DuelEngine.cs`, `Endpoints/MesaEndpoints.cs`): um amigo
+  cria a mesa (código de 6 letras) e até 6 entram. Todos jogam no mesmo mundo: mesma semente, jogos dos
+  outros clubes simulados pela semente, placares reais dos clubes dos amigos e classificações finais
+  compartilhados pela mesa (tabelas iguais, mesmo acesso e rebaixamento). Com o calendário junto, ninguém
+  passa de uma data enquanto um amigo não chegou nela. Quando os clubes de dois amigos se enfrentam na liga
+  (amigos na mesma liga se enfrentam no meio da temporada), o jogo vira **duelo**: 6 lances alternando quem
+  ataca; o atacante escolhe chute, drible ou passe, o defensor tenta adivinhar (+4 se acertar, +2 para o
+  atacante se errar) e os dois rolam d20 + (atributo − 50) ÷ 5. Amistosos a qualquer hora; se o amigo sumir,
+  depois de 90 s dá para decidir por ele. Diário da mesa com entradas, duelos, títulos e transferências.
+  Gravações de um documento por vez (MongoDB sem réplica não aceita transação com vários documentos).
 - **Estatísticas dos jogos**: jogos, gols, assistências e nota do balanço são a soma das partidas do
   jogador (parte dos gols do time é dele, pela posição; a nota de cada jogo vem dos gols, passes,
   decisões e do resultado).
