@@ -11,6 +11,8 @@ namespace Camisa10.Api.Data;
 public class Camisa10DbContext(DbContextOptions<Camisa10DbContext> options) : DbContext(options)
 {
     public DbSet<Career> Careers => Set<Career>();
+    public DbSet<Mesa> Mesas => Set<Mesa>();
+    public DbSet<Duel> Duels => Set<Duel>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -36,6 +38,13 @@ public class Camisa10DbContext(DbContextOptions<Camisa10DbContext> options) : Db
         modelBuilder.Owned<BracketRound>();
         modelBuilder.Owned<BracketTie>();
         modelBuilder.Owned<Trophy>();
+        modelBuilder.Owned<DuelRef>();
+        modelBuilder.Owned<MesaMember>();
+        modelBuilder.Owned<MesaFeedItem>();
+        modelBuilder.Owned<MesaResult>();
+        modelBuilder.Owned<LeagueResult>();
+        modelBuilder.Owned<DuelSide>();
+        modelBuilder.Owned<DuelMoment>();
         modelBuilder.Owned<Chip>();
         modelBuilder.Owned<SeasonReport>();
         modelBuilder.Owned<GameEvent>();
@@ -51,6 +60,22 @@ public class Camisa10DbContext(DbContextOptions<Camisa10DbContext> options) : Db
             e.Property(c => c.Status).HasConversion<string>();
             e.Property(c => c.Version).IsConcurrencyToken();
             e.HasIndex(c => new { c.PlayerId, c.Status, c.UpdatedAt });
+        });
+
+        modelBuilder.Entity<Mesa>(e =>
+        {
+            e.ToCollection("mesas");
+            e.HasKey(m => m.Id);
+            e.Property(m => m.Version).IsConcurrencyToken();
+            e.HasIndex(m => m.Code);
+        });
+
+        modelBuilder.Entity<Duel>(e =>
+        {
+            e.ToCollection("duels");
+            e.HasKey(d => d.Id);
+            e.Property(d => d.Version).IsConcurrencyToken();
+            e.HasIndex(d => d.MesaId);
         });
     }
 }

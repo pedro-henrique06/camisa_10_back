@@ -30,18 +30,47 @@ public sealed partial class GameEngine
         if (s.LeagueTableKey == key && s.LeagueTable.Count == league.Ids.Count) return;
         s.LeagueTableKey = key;
         s.LeagueRound = 0;
+        s.LeagueResults = new List<LeagueResult>();
         s.LeagueTable = league.Ids.Select(id => new LeagueRow
         {
             ClubId = id,
             Club = World.World.Club(id)!.Name + (s.Base ? " sub-20" : "")
         }).ToList();
+        s.LeagueOrder = FixtureOrder(league.Ids);
+    }
+
+    /// <summary>
+    /// Ordem do sorteio da temporada. Na mesa, os clubes dos amigos na mesma liga ficam em posições que
+    /// fazem o primeiro deles enfrentar os outros no meio da temporada (o clássico da mesa).
+    /// </summary>
+    private List<string> FixtureOrder(List<string> ids)
+    {
+        var order = ids.OrderBy(id => StableSeed($"{s.WorldSeed}|{s.Season}|{s.LeagueTableKey}|{id}")).ToList();
+        if (order.Count % 2 == 1) order.Add(""); // folga
+        var mesa = Mesa == null ? new List<string>() : Mesa.Friends.Select(f => f.ClubId).Where(id => id != null && ids.Contains(id))
+            .Append(MyLeagueClubId).Distinct().OrderBy(x => x, StringComparer.Ordinal).ToList()!;
+        if (mesa.Count < 2) return order;
+        var n = order.Count;
+        var rounds = Math.Max(1, CompetitionOf("league")?.Days.Count ?? n - 1);
+        var slots = new string?[n];
+        slots[0] = mesa[0];
+        for (var j = 1; j < mesa.Count; j++)
+        {
+            var target = (rounds / 2 + j - 1) % rounds;
+            var slot = 1 + (n - 2 + target) % (n - 1); // no método do círculo, enfrenta o 1º na rodada "target"
+            if (slots[slot] == null) slots[slot] = mesa[j];
+        }
+        var rest = new Queue<string>(order.Where(id => !slots.Contains(id)));
+        for (var i = 0; i < n; i++) slots[i] ??= rest.Dequeue();
+        return slots.Select(x => x!).ToList();
     }
 
     /// <summary>Confrontos da rodada <paramref name="round"/> (mandante, visitante), sem repetir até o returno.</summary>
     private List<(string Home, string Away)> Fixtures(int round)
     {
-        var ids = s.LeagueTable.Select(r => r.ClubId)
-            .OrderBy(id => StableSeed($"{s.WorldSeed}|{s.Season}|{s.LeagueTableKey}|{id}")).ToList();
+        var ids = s.LeagueOrder.Count >= s.LeagueTable.Count && s.LeagueOrder.Count > 0
+            ? s.LeagueOrder.ToList()
+            : s.LeagueTable.Select(r => r.ClubId).OrderBy(id => StableSeed($"{s.WorldSeed}|{s.Season}|{s.LeagueTableKey}|{id}")).ToList();
         if (ids.Count % 2 == 1) ids.Add(""); // folga
         var n = ids.Count;
         var r = round % (n - 1);
@@ -99,35 +128,53 @@ public sealed partial class GameEngine
         foreach (var (h, a) in Fixtures(round))
         {
             int hg, ag;
+            var known = Mesa?.Results?.FirstOrDefault(r => r.Season == s.Season && r.Key == s.LeagueTableKey && r.Round == round && r.Home == h && r.Away == a);
             if (mine is { } m && (h == me || a == me))
                 (hg, ag) = h == me ? (m.For, m.Against) : (m.Against, m.For);
+            else if (known != null)
+                (hg, ag) = (known.HomeGoals, known.AwayGoals); // placar real do clube de um amigo da mesa
             else
-                (hg, ag) = SimulateScore(h, a);
+                (hg, ag) = SimulateScore(h, a, round);
             Record(h, hg, ag);
             Record(a, ag, hg);
+            s.LeagueResults.Add(new LeagueResult { Round = round, Home = h, Away = a, HomeGoals = hg, AwayGoals = ag });
         }
         s.LeagueRound = round + 1;
     }
 
-    private void Record(string id, int gf, int ga)
+    /// <summary>Soma (ou, com <paramref name="sign"/> = -1, desfaz) um jogo na linha do clube.</summary>
+    private void Record(string id, int gf, int ga, int sign = 1)
     {
         var row = s.LeagueTable.FirstOrDefault(r => r.ClubId == id);
         if (row == null) return;
-        row.Played++;
-        row.GoalsFor += gf;
-        row.GoalsAgainst += ga;
-        if (gf > ga) { row.Won++; row.Points += 3; }
-        else if (gf == ga) { row.Drawn++; row.Points += 1; }
-        else row.Lost++;
+        row.Played += sign;
+        row.GoalsFor += gf * sign;
+        row.GoalsAgainst += ga * sign;
+        if (gf > ga) { row.Won += sign; row.Points += 3 * sign; }
+        else if (gf == ga) { row.Drawn += sign; row.Points += sign; }
+        else row.Lost += sign;
     }
 
-    /// <summary>Placar de um jogo entre dois clubes pela força (prestígio) e o mando.</summary>
-    private (int, int) SimulateScore(string home, string away)
+    /// <summary>
+    /// Placar de um jogo entre dois clubes pela força (prestígio) e o mando. Sai da semente do mundo, então
+    /// é o mesmo em todas as carreiras do mesmo mundo (os amigos da mesa veem os mesmos resultados).
+    /// </summary>
+    private (int, int) SimulateScore(string home, string away, int round)
     {
         var ph = World.World.Club(home)!.Prestige;
         var pa = World.World.Club(away)!.Prestige;
         var diff = (ph - pa) * 1.6;
-        return (Poisson(1.35 * Math.Exp(diff / 2 + .1)), Poisson(1.1 * Math.Exp(-diff / 2 - .1)));
+        var rng = new Random(StableSeed($"{s.WorldSeed}|{s.Season}|{s.LeagueTableKey}|{round}|{home}|{away}"));
+        return (Poisson(1.35 * Math.Exp(diff / 2 + .1), rng), Poisson(1.1 * Math.Exp(-diff / 2 - .1), rng));
+    }
+
+    private static int Poisson(double lambda, Random rng)
+    {
+        var l = Math.Exp(-lambda);
+        var k = 0;
+        var p = 1.0;
+        do { k++; p *= rng.NextDouble(); } while (p > l && k < 9);
+        return k - 1;
     }
 
     private int Poisson(double lambda)

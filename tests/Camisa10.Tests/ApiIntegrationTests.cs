@@ -128,3 +128,171 @@ public class ApiIntegrationTests : IDisposable
         new MongoClient(MongoFactAttribute.Url).DropDatabase(_db);
     }
 }
+
+public class MesaIntegrationTests : IDisposable
+{
+    private readonly string _db = "camisa10_mesa_" + Guid.NewGuid().ToString("N")[..8];
+    private readonly WebApplicationFactory<Program>? _factory;
+    private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web) { Converters = { new JsonStringEnumConverter() } };
+
+    public MesaIntegrationTests()
+    {
+        if (MongoFactAttribute.Url == null) return;
+        _factory = new WebApplicationFactory<Program>().WithWebHostBuilder(b =>
+        {
+            b.UseSetting("ConnectionStrings:Mongo", MongoFactAttribute.Url);
+            b.UseSetting("Mongo:Database", _db);
+        });
+    }
+
+    private HttpClient Client(string player)
+    {
+        var c = _factory!.CreateClient();
+        c.DefaultRequestHeaders.Add("X-Player-Id", player);
+        return c;
+    }
+
+    private static async Task<JsonElement> Json_(HttpResponseMessage r) => JsonSerializer.Deserialize<JsonElement>(await r.Content.ReadAsStringAsync());
+
+    /// <summary>Joga um lado do duelo até ele acabar (as escolhas do outro lado vêm da outra chamada).</summary>
+    private static async Task<bool> PlayDuel(HttpClient a, HttpClient b, string duelId)
+    {
+        for (var i = 0; i < 40; i++)
+        {
+            var progressed = false;
+            foreach (var (http, pick) in new[] { (a, 0), (b, 2) })
+            {
+                var v = await Json_(await http.GetAsync($"/api/duels/{duelId}"));
+                if (v.GetProperty("finished").GetBoolean()) return true;
+                var turn = v.GetProperty("turn");
+                if (turn.GetProperty("myChoice").ValueKind == JsonValueKind.Null)
+                {
+                    var r = await http.PostAsJsonAsync($"/api/duels/{duelId}/choose", new { index = (i + pick) % 3 });
+                    Assert.Equal(HttpStatusCode.OK, r.StatusCode);
+                    progressed = true;
+                }
+            }
+            if (!progressed) return false;
+        }
+        return false;
+    }
+
+    [MongoFact]
+    public async Task Mesa_com_dois_amigos_anda_junto_tem_classico_em_duelo_e_tabelas_iguais()
+    {
+        var ana = Client("player-mesa-ana");
+        var beto = Client("player-mesa-beto");
+        var created = await Json_(await ana.PostAsJsonAsync("/api/mesas", new { name = "Mesa de teste", playerName = "Ana" }));
+        var mesaId = created.GetProperty("id").GetString()!;
+        var code = created.GetProperty("code").GetString()!;
+        Assert.Equal(6, code.Length);
+        var joined = await beto.PostAsJsonAsync("/api/mesas/join", new { code, playerName = "Beto" });
+        Assert.Equal(HttpStatusCode.OK, joined.StatusCode);
+
+        var ca = await Json_(await ana.PostAsJsonAsync($"/api/mesas/{mesaId}/careers", new { name = "Ana", club = "Palmeiras", nation = "Brasil", position = "Atacante" }));
+        var cb = await Json_(await beto.PostAsJsonAsync($"/api/mesas/{mesaId}/careers", new { name = "Beto", club = "Corinthians", nation = "Brasil", position = "Zagueiro" }));
+        var ids = new[] { ca.GetProperty("id").GetString()!, cb.GetProperty("id").GetString()! };
+        var clients = new[] { ana, beto };
+        var rng = new Random(3);
+        var leagueDuels = new HashSet<string>();
+        var waited = 0;
+
+        // joga as duas carreiras alternando: quem está na frente espera o outro
+        for (var step = 0; step < 6000; step++)
+        {
+            var who = step % 2;
+            var http = clients[who];
+            var v = await Json_(await http.GetAsync($"/api/careers/{ids[who]}"));
+            var phase = v.GetProperty("phase").GetString();
+            if (v.GetProperty("status").GetString() == "Finished") break;
+            if (leagueDuels.Count >= 2) break;
+            if (phase == "Duel")
+            {
+                var duelId = v.GetProperty("duel").GetProperty("duelId").GetString()!;
+                leagueDuels.Add(duelId);
+                var other = clients[1 - who];
+                var otherView = await Json_(await other.GetAsync($"/api/careers/{ids[1 - who]}"));
+                // o amigo ainda não chegou no clássico: este lado espera (o outro vai jogar até chegar)
+                if (otherView.GetProperty("phase").GetString() != "Duel" && !(await Json_(await http.GetAsync($"/api/duels/{duelId}"))).GetProperty("finished").GetBoolean())
+                {
+                    step++;
+                    // deixa o outro andar
+                    var o = otherView;
+                    for (var k = 0; k < 400 && o.GetProperty("phase").GetString() != "Duel"; k++)
+                    {
+                        var r2 = await Act(other, ids[1 - who], o, rng);
+                        if (r2 == null) break;
+                        o = r2.Value;
+                    }
+                }
+                Assert.True(await PlayDuel(clients[0], clients[1], duelId), "duelo terminou");
+            }
+            var res = await Act(http, ids[who], v, rng);
+            if (res == null) waited++;
+        }
+
+        Assert.True(leagueDuels.Count > 0, $"nenhum clássico; idades {string.Join(",", await Task.WhenAll(ids.Select(async (id, i) => (await Json_(await clients[i].GetAsync($"/api/careers/{id}"))).GetProperty("hud").GetProperty("age").GetInt32())))}");
+        Assert.True(waited > 0, "o calendário junto fez alguém esperar");
+
+        // depois do clássico, as duas tabelas da liga são iguais (mesmo mundo e placares reais compartilhados)
+        var va = await Json_(await ana.GetAsync($"/api/careers/{ids[0]}"));
+        var vb = await Json_(await beto.GetAsync($"/api/careers/{ids[1]}"));
+        var ta = va.GetProperty("calendar").GetProperty("table");
+        var tb = vb.GetProperty("calendar").GetProperty("table");
+        if (ta.GetProperty("round").GetInt32() == tb.GetProperty("round").GetInt32() && ta.GetProperty("league").GetString() == tb.GetProperty("league").GetString())
+        {
+            string Rows(JsonElement t) => string.Join(";", t.GetProperty("rows").EnumerateArray()
+                .Select(r => $"{r.GetProperty("club").GetString()}:{r.GetProperty("points").GetInt32()}:{r.GetProperty("played").GetInt32()}"));
+            Assert.Equal(Rows(ta), Rows(tb));
+        }
+
+        // diário e duelos na mesa
+        var mesa = await Json_(await beto.GetAsync($"/api/mesas/{mesaId}"));
+        Assert.Contains(mesa.GetProperty("feed").EnumerateArray(), f => f.GetProperty("text").GetString()!.Contains("Ana") && f.GetProperty("text").GetString()!.Contains("Beto"));
+        Assert.Contains(mesa.GetProperty("duels").EnumerateArray(), d => d.GetProperty("kind").GetString() == "league" && d.GetProperty("finished").GetBoolean());
+
+        // amistoso a qualquer hora
+        var betoId = mesa.GetProperty("members").EnumerateArray().First(m => m.GetProperty("name").GetString() == "Beto").GetProperty("playerId").GetString();
+        var friendly = await ana.PostAsJsonAsync($"/api/mesas/{mesaId}/duels", new { opponentPlayerId = betoId });
+        Assert.Equal(HttpStatusCode.Created, friendly.StatusCode);
+        var fid = (await Json_(friendly)).GetProperty("id").GetString()!;
+        Assert.True(await PlayDuel(ana, beto, fid));
+        var outsider = Client("player-mesa-outsider");
+        Assert.Equal(HttpStatusCode.NotFound, (await outsider.GetAsync($"/api/duels/{fid}")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await outsider.GetAsync($"/api/mesas/{mesaId}")).StatusCode);
+    }
+
+    /// <summary>Uma ação de bot na carreira. Nulo = a mesa mandou esperar o amigo.</summary>
+    private static async Task<JsonElement?> Act(HttpClient http, string id, JsonElement v, Random rng)
+    {
+        if (v.GetProperty("status").GetString() == "Finished") return null;
+        var phase = v.GetProperty("phase").GetString();
+        var version = v.GetProperty("version").GetInt32();
+        object action = phase switch
+        {
+            // o bot nunca escolhe parar a carreira (a última opção do veredito médico)
+            "Event" => new { type = "Choose", index = v.GetProperty("event").GetProperty("id").GetString() == "vd" ? 0 : rng.Next(v.GetProperty("event").GetProperty("options").GetArrayLength()), version },
+            "Penalty" => new { type = "Choose", index = 3, version, power = 75 },
+            "Market" => new { type = "Stay", version },
+            "Swap" => new { type = "Choose", index = 1, version },
+            "Decision" => new { type = "Continue", version },
+            _ => new { type = "Continue", version }
+        };
+        var r = await http.PostAsJsonAsync($"/api/careers/{id}/actions", action);
+        if (r.StatusCode == HttpStatusCode.BadRequest)
+        {
+            var text = await r.Content.ReadAsStringAsync();
+            Assert.True(text.Contains("Esperando") || text.Contains("duelo"), text);
+            return null;
+        }
+        Assert.Equal(HttpStatusCode.OK, r.StatusCode);
+        return await Json_(r);
+    }
+
+    public void Dispose()
+    {
+        if (_factory == null) return;
+        _factory.Dispose();
+        new MongoClient(MongoFactAttribute.Url).DropDatabase(_db);
+    }
+}

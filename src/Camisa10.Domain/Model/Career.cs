@@ -107,8 +107,16 @@ public class Career
     public string? LeagueTableKey { get; set; }
     /// <summary>Rodadas da liga já jogadas.</summary>
     public int LeagueRound { get; set; }
+    /// <summary>Ordem dos clubes no sorteio dos confrontos (fixa na temporada; "" = folga).</summary>
+    public List<string> LeagueOrder { get; set; } = new();
+    /// <summary>Todos os jogos da liga já disputados na temporada (para acertar a tabela com a mesa).</summary>
+    public List<LeagueResult> LeagueResults { get; set; } = new();
     /// <summary>Jogos do jogador na temporada (placar, gols, assistências e nota).</summary>
     public List<MatchRecord> SeasonMatches { get; set; } = new();
+    /// <summary>Mesa (jogo com amigos) desta carreira; nula no jogo solo.</summary>
+    public string? MesaId { get; set; }
+    /// <summary>Duelo da liga marcado para hoje contra um amigo da mesa.</summary>
+    public DuelRef? PendingDuel { get; set; }
     /// <summary>Sala de troféus: cada título com a temporada, a idade e o time.</summary>
     public List<Trophy> Trophies { get; set; } = new();
 
@@ -161,6 +169,8 @@ public enum GamePhase
     Penalty,
     /// <summary>Resultado da última escolha.</summary>
     Result,
+    /// <summary>Duelo da Mesa: o jogo da rodada é contra um amigo.</summary>
+    Duel,
     /// <summary>Janela de transferências com propostas.</summary>
     Market,
     /// <summary>O treinador sugere mudança de posição.</summary>
@@ -367,6 +377,16 @@ public class ClubSeasonResult
     public int Size { get; set; }
     /// <summary>Classificação final da liga (ids, do 1º ao último), para o acesso e rebaixamento do mundo.</summary>
     public List<string> Order { get; set; } = new();
+}
+
+/// <summary>Um jogo da liga já disputado.</summary>
+public class LeagueResult
+{
+    public int Round { get; set; }
+    public string Home { get; set; } = "";
+    public string Away { get; set; } = "";
+    public int HomeGoals { get; set; }
+    public int AwayGoals { get; set; }
 }
 
 /// <summary>Linha da tabela da liga.</summary>

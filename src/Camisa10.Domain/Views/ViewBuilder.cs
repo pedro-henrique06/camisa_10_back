@@ -30,7 +30,10 @@ public static class ViewBuilder
                 ? new SeasonView(s.LastSeason, s.Rival, s.RivalClub, s.RivalOverall, s.RivalGoals, s.RivalTitles, s.Goals, s.Assists)
                 : null,
             s.Phase == GamePhase.Decision ? new DecisionView(s.Age) : null,
-            s.Phase == GamePhase.Finished ? Final(s, engine) : null);
+            s.Phase == GamePhase.Finished ? Final(s, engine) : null,
+            s.Phase == GamePhase.Duel && s.PendingDuel is { } pd
+                ? new DuelPhaseView(pd.DuelId, pd.OpponentName, pd.OpponentClub, pd.Home, pd.Competition)
+                : null);
     }
 
     // ------------------------------------------------------------------ HUD

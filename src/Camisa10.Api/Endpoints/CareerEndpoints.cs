@@ -42,7 +42,7 @@ public static partial class CareerEndpoints
         careers.MapDelete("/{id}", DeleteCareer).WithSummary("Apaga uma carreira.");
     }
 
-    private static async ValueTask<object?> RequirePlayer(EndpointFilterInvocationContext ctx, EndpointFilterDelegate next)
+    internal static async ValueTask<object?> RequirePlayer(EndpointFilterInvocationContext ctx, EndpointFilterDelegate next)
     {
         var id = ctx.HttpContext.Request.Headers[PlayerHeader].ToString();
         if (!PlayerIdRx().IsMatch(id))
@@ -83,8 +83,15 @@ public static partial class CareerEndpoints
     {
         var career = await Find(db, http, id, ct, tracking: false);
         if (career == null) return TypedResults.NotFound();
-        new GameEngine(career).EnsureCalendar(); // só para a tela; é gravado na próxima ação
-        return TypedResults.Ok(ViewBuilder.Build(career));
+        var engine = new GameEngine(career);
+        engine.EnsureCalendar(); // só para a tela; é gravado na próxima ação
+        if (career.MesaId != null && await db.Mesas.AsNoTracking().FirstOrDefaultAsync(m => m.Id == career.MesaId, ct) is { } mesa)
+        {
+            // a tabela já aparece com os placares reais dos amigos
+            engine.Mesa = MesaService.Context(mesa, await MesaService.Friends(db, mesa, career.Id, ct));
+            engine.SyncMesa();
+        }
+        return TypedResults.Ok(await WithMesa(db, career, ViewBuilder.Build(career), ct));
     }
 
     private static async Task<Results<Ok<GameView>, NotFound, ProblemHttpResult, Conflict<GameView>>> Act(
@@ -94,11 +101,32 @@ public static partial class CareerEndpoints
         if (career == null) return TypedResults.NotFound();
 
         // O app mostrava uma tela antiga (ex.: toque duplo): devolve a tela atual sem aplicar nada.
-        if (req.Version is { } v && v != career.Version) return TypedResults.Conflict(ViewBuilder.Build(career));
+        if (req.Version is { } v && v != career.Version) return TypedResults.Conflict(await WithMesa(db, career, ViewBuilder.Build(career), ct));
 
+        // Mesa: amigos (para os duelos) e o calendário junto
+        var mesa = career.MesaId == null ? null : await db.Mesas.AsNoTracking().FirstOrDefaultAsync(m => m.Id == career.MesaId, ct);
+        var friends = mesa == null ? new() : await MesaService.Friends(db, mesa, career.Id, ct);
+        if (mesa != null && MesaService.Advances(career, req.Type) && MesaService.WaitingFor(mesa, career, friends) is { Count: > 0 } waiting)
+            return TypedResults.Problem($"Esperando {string.Join(", ", waiting)} chegar nesta data para a mesa seguir junta.",
+                statusCode: StatusCodes.Status400BadRequest);
+
+        var before = MesaService.Snap(career);
+        var engine = new GameEngine(career) { Mesa = mesa == null ? null : MesaService.Context(mesa, friends) };
+        // acerta a tabela e o mundo com os resultados reais dos amigos
+        engine.SyncMesa();
         try
         {
-            new GameEngine(career).Act(new GameAction(req.Type, req.Index, req.Power));
+            if (career.Phase == GamePhase.Duel && req.Type == ActionType.Continue && career.PendingDuel?.DuelId is { } duelId)
+            {
+                // fim do duelo da Mesa: o placar vale para a carreira
+                if (mesa != null) await MesaService.EnsureLeagueDuel(db, career, mesa, ct);
+                var duel = await db.Duels.AsNoTracking().FirstOrDefaultAsync(d => d.Id == duelId, ct);
+                if (duel == null || !duel.Finished)
+                    return TypedResults.Problem("O duelo ainda não acabou. Jogue os lances com o seu amigo.", statusCode: StatusCodes.Status400BadRequest);
+                var side = duel.Home.CareerId == career.Id ? "home" : "away";
+                engine.FinishDuel(new DuelEngine(duel).OutcomeFor(side));
+            }
+            else engine.Act(new GameAction(req.Type, req.Index, req.Power));
         }
         catch (GameRuleException e)
         {
@@ -116,7 +144,14 @@ public static partial class CareerEndpoints
             var fresh = await Find(db, http, id, ct, tracking: false);
             return TypedResults.Conflict(ViewBuilder.Build(fresh!));
         }
-        return TypedResults.Ok(ViewBuilder.Build(career));
+        if (mesa != null)
+        {
+            await MesaService.Share(db, mesa.Id, career, ct);
+            if (career.PendingDuel != null) await MesaService.EnsureLeagueDuel(db, career, mesa, ct);
+            var name = mesa.Members.FirstOrDefault(m => m.CareerId == career.Id)?.Name ?? career.Name;
+            foreach (var (icon, text) in MesaService.News(name, before, career)) await MesaService.Post(db, mesa.Id, icon, text, ct);
+        }
+        return TypedResults.Ok(await WithMesa(db, career, ViewBuilder.Build(career), ct));
     }
 
     private static async Task<Results<Ok<HistoryView>, NotFound>> GetHistory(HttpContext http, string id, Camisa10DbContext db, CancellationToken ct)
@@ -132,6 +167,17 @@ public static partial class CareerEndpoints
         db.Careers.Remove(career);
         await db.SaveChangesAsync(ct);
         return TypedResults.NoContent();
+    }
+
+    /// <summary>Junta à tela a situação da mesa (amigos e quem falta chegar na data).</summary>
+    private static async Task<GameView> WithMesa(Camisa10DbContext db, Career career, GameView view, CancellationToken ct)
+    {
+        if (career.MesaId == null) return view;
+        var mesa = await db.Mesas.AsNoTracking().FirstOrDefaultAsync(m => m.Id == career.MesaId, ct);
+        if (mesa == null) return view;
+        if (career.Phase == GamePhase.Duel) await MesaService.EnsureLeagueDuel(db, career, mesa, ct);
+        var friends = await MesaService.Friends(db, mesa, career.Id, ct);
+        return view with { Mesa = MesaService.Status(mesa, career, friends) };
     }
 
     private static Task<Career?> Find(Camisa10DbContext db, HttpContext http, string id, CancellationToken ct, bool tracking)
