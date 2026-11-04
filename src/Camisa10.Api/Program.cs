@@ -37,6 +37,7 @@ app.MapGet("/health", (DatabaseStatus db) => Results.Ok(new
     mongoErro = db.Connected ? null : db.LastError
 }));
 app.MapCareerEndpoints();
+app.MapMesaEndpoints();
 
 app.Run();
 

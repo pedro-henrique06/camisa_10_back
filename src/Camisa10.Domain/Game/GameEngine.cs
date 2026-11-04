@@ -237,7 +237,14 @@ public sealed partial class GameEngine
         // Dia de jogo da liga, nas datas do calendário: a rodada inteira é jogada (a do jogador ao vivo).
         var leagueRound = LeagueRoundOfToday();
         var fixture = leagueRound >= 0 ? LeagueFixtureToday(leagueRound) : null;
-        if (leagueRound >= 0 && (s.Injury > 0 || fixture == null)) PlayLeagueRound(leagueRound, null);
+        // Mesa: o adversário da rodada é o clube de um amigo → duelo entre os dois (vale mesmo lesionado)
+        var friend = fixture is { } fx0 ? FriendOpponent(fx0) : null;
+        if (friend != null && CompetitionOf("league") is { } duelComp)
+        {
+            QueueDuel(friend, fixture!.Value, leagueRound, duelComp.Name);
+            fixture = null;
+        }
+        else if (leagueRound >= 0 && (s.Injury > 0 || fixture == null)) PlayLeagueRound(leagueRound, null);
         if (leagueRound >= 0 && fixture != null && s.Injury <= 0 && CompetitionOf("league") is { } leagueComp)
         {
             var matchDay = new List<EventDef> { Events.Jogo };
@@ -293,6 +300,7 @@ public sealed partial class GameEngine
     {
         BeforeMoment(ev);
         s.Current = ev;
+        if (ev.EventId == "duel" && s.PendingDuel != null) { s.Phase = GamePhase.Duel; return; }
         if (ev.EventId != null) s.MarkUsed(ev.EventId);
         s.Phase = ev.IsPenalty ? GamePhase.Penalty : GamePhase.Event;
     }

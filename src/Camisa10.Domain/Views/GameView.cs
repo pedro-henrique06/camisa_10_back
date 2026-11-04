@@ -20,7 +20,21 @@ public record GameView(
     PromotionView? Promotion,
     SeasonView? Season,
     DecisionView? Decision,
-    FinalView? Final);
+    FinalView? Final,
+    /// <summary>Duelo da Mesa marcado para hoje (fase Duel).</summary>
+    DuelPhaseView? Duel = null,
+    /// <summary>Mesa da carreira: amigos, quem falta jogar a data e o diário (preenchido pela API).</summary>
+    MesaStatusView? Mesa = null);
+
+/// <summary>O jogo da rodada é contra um amigo da mesa: o app abre o duelo.</summary>
+public record DuelPhaseView(string? DuelId, string OpponentName, string OpponentClub, bool Home, string Competition);
+
+/// <summary>Situação da mesa vista da carreira.</summary>
+public record MesaStatusView(string Id, string Name, string Code, bool Sync, IReadOnlyList<string> WaitingFor,
+    IReadOnlyList<MesaFriendView> Friends);
+
+/// <summary>Um amigo da mesa: clube, onde está no calendário e na tabela.</summary>
+public record MesaFriendView(string Name, string? Club, string? Date, int Season, int SeasonDay, int Position, int Overall, string Phase, bool Me);
 
 public record Badge(string Primary, string Secondary, string Initials);
 
