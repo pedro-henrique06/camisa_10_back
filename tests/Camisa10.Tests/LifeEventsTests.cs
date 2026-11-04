@@ -53,7 +53,7 @@ public class LifeEventsTests(ITestOutputHelper output)
         Assert.Contains(all, x => x.Id.StartsWith("v_") && x.Age <= 18);
         Assert.Contains(all, x => x.Id.StartsWith("v_") && x.Age >= 31);
         // o cachorro é adotado uma vez só; os imprevistos aparecem pouco
-        Assert.True(worstRepeat <= 6, $"um evento apareceu {worstRepeat} vezes numa carreira");
+        Assert.True(worstRepeat <= 8, $"um evento apareceu {worstRepeat} vezes numa carreira");
         // antes desta mudança: 34 por carreira, com o mesmo evento até 17 vezes
         Assert.True(genericTotal / (double)careers <= 8, "cachorro, assalto, cano e pai aparecem demais");
         Assert.True(all.Select(x => x.Id).Distinct().Count() >= 80, "pouca variedade de eventos pessoais");

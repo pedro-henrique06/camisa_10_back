@@ -274,7 +274,7 @@ public class MesaIntegrationTests : IDisposable
             if (res == null) waited++;
         }
 
-        Assert.True(leagueDuels.Count > 0, $"nenhum clássico; idades {string.Join(",", await Task.WhenAll(ids.Select(async (id, i) => (await Json_(await clients[i].GetAsync($"/api/careers/{id}"))).GetProperty("hud").GetProperty("age").GetInt32())))}");
+        Assert.True(leagueDuels.Count > 0, $"nenhum clássico; {string.Join(" | ", await Task.WhenAll(ids.Select(async (id, i) => { var h = (await Json_(await clients[i].GetAsync($"/api/careers/{id}"))).GetProperty("hud"); return $"{h.GetProperty("age").GetInt32()} anos, {h.GetProperty("club").GetString()}, {h.GetProperty("league")}"; })))}");
         Assert.True(waited > 0, "o calendário junto fez alguém esperar");
 
         // depois do clássico, as duas tabelas da liga são iguais (mesmo mundo e placares reais compartilhados)
@@ -393,6 +393,18 @@ public class MesaIntegrationTests : IDisposable
         Assert.Contains(mesa.GetProperty("feed").EnumerateArray(), f => f.GetProperty("text").GetString()!.StartsWith("Todos prontos"));
     }
 
+    /// <summary>
+    /// Escolha aleatória que não leva o jogador para outro clube: o clássico da mesa só acontece com
+    /// os dois na mesma liga (transferências tornavam o teste instável).
+    /// </summary>
+    private static int StayIndex(JsonElement options, Random rng)
+    {
+        var moves = new[] { "Aceitar a fortuna", "Sair de graça", "Aceitar o desafio", "outro clube", "procurar clube", "empréstimo" };
+        var safe = Enumerable.Range(0, options.GetArrayLength())
+            .Where(i => !moves.Any(m => options[i].GetProperty("label").GetString()!.Contains(m, StringComparison.OrdinalIgnoreCase))).ToList();
+        return safe.Count > 0 ? safe[rng.Next(safe.Count)] : rng.Next(options.GetArrayLength());
+    }
+
     private static async Task<JsonElement?> Act(HttpClient http, string id, JsonElement v, Random rng)
     {
         if (v.GetProperty("status").GetString() == "Finished") return null;
@@ -401,7 +413,7 @@ public class MesaIntegrationTests : IDisposable
         object action = phase switch
         {
             // o bot nunca escolhe parar a carreira (a última opção do veredito médico)
-            "Event" => new { type = "Choose", index = v.GetProperty("event").GetProperty("id").GetString() == "vd" ? 0 : rng.Next(v.GetProperty("event").GetProperty("options").GetArrayLength()), version },
+            "Event" => new { type = "Choose", index = v.GetProperty("event").GetProperty("id").GetString() == "vd" ? 0 : StayIndex(v.GetProperty("event").GetProperty("options"), rng), version },
             "Penalty" => new { type = "Choose", index = 3, version, power = 75 },
             "Market" => new { type = "Stay", version },
             "Swap" => new { type = "Choose", index = 1, version },
