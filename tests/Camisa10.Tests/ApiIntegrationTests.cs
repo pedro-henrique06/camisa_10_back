@@ -121,6 +121,42 @@ public class ApiIntegrationTests : IDisposable
         Assert.Contains(reloaded.Calendar.Cells, c => c.Kind == "league");
     }
 
+    [MongoFact]
+    public async Task Carreira_de_versao_antiga_sem_campos_novos_abre_depois_da_atualizacao()
+    {
+        var http = Client("player-versao-antiga");
+        var created = await http.PostAsJsonAsync("/api/careers", new { name = "X", club = "Palmeiras", nation = "Brasil", position = "Meia" });
+        var view = (await created.Content.ReadFromJsonAsync<GameView>(Json))!;
+
+        // documento como era antes da tabela ao vivo, da mesa e da sala de troféus (inclusive dentro das competições)
+        var careers = new MongoClient(MongoFactAttribute.Url).GetDatabase(_db).GetCollection<MongoDB.Bson.BsonDocument>("careers");
+        var unset = new MongoDB.Bson.BsonDocument
+        {
+            { "LeagueOrder", "" }, { "LeagueResults", "" }, { "LeagueRound", "" }, { "Trophies", "" }, { "SeasonMatches", "" },
+            { "Competitions.$[].KoRounds", "" }, { "Competitions.$[].Sequential", "" }, { "Overall", "" }
+        };
+        await careers.UpdateOneAsync(new MongoDB.Bson.BsonDocument("_id", view.Id), new MongoDB.Bson.BsonDocument("$unset", unset));
+        var broken = await http.GetAsync($"/api/careers/{view.Id}");
+        Assert.Equal(HttpStatusCode.InternalServerError, broken.StatusCode);
+
+        // a API sobe de novo (deploy): completa o documento e a carreira volta a abrir e a jogar
+        using var restarted = _factory!.WithWebHostBuilder(_ => { });
+        var http2 = restarted.CreateClient();
+        http2.DefaultRequestHeaders.Add("X-Player-Id", "player-versao-antiga");
+        for (var i = 0; i < 50; i++)
+        {
+            var health = await http2.GetStringAsync("/health");
+            if (health.Contains("\"conectado\"")) break;
+            await Task.Delay(200);
+        }
+        var reloaded = await http2.GetFromJsonAsync<GameView>($"/api/careers/{view.Id}", Json);
+        Assert.Equal(55, reloaded!.Hud.Overall);
+        var list = await http2.GetFromJsonAsync<List<JsonElement>>("/api/careers");
+        Assert.Single(list!);
+        var next = await http2.PostAsJsonAsync($"/api/careers/{view.Id}/actions", new { type = "Continue", version = reloaded.Version });
+        Assert.True(next.StatusCode is HttpStatusCode.OK or HttpStatusCode.BadRequest, next.StatusCode.ToString());
+    }
+
     public void Dispose()
     {
         if (_factory == null) return;

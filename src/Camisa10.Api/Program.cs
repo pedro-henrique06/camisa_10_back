@@ -16,7 +16,7 @@ var mongo = builder.Configuration.GetConnectionString("Mongo") ?? "mongodb://loc
 var database = builder.Configuration["Mongo:Database"] ?? "camisa10";
 builder.Services.AddDbContext<Camisa10DbContext>(o => o.UseMongoDB(mongo, database));
 
-builder.Services.AddSingleton(new DatabaseStatus(DescribeMongo(mongo)));
+builder.Services.AddSingleton(new DatabaseStatus(DescribeMongo(mongo)) { ConnectionString = mongo, Database = database });
 builder.Services.AddHostedService<DatabaseInitializer>();
 builder.Services.ConfigureHttpJsonOptions(o => o.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 builder.Services.AddProblemDetails();
@@ -81,6 +81,8 @@ public partial class Program;
 public sealed class DatabaseStatus(string server)
 {
     public string Server { get; } = server;
+    public string ConnectionString { get; init; } = "";
+    public string Database { get; init; } = "";
     public volatile bool Connected;
     public string? LastError;
 }
@@ -99,7 +101,12 @@ public sealed class DatabaseInitializer(IServiceProvider services, DatabaseStatu
             try
             {
                 using var scope = services.CreateScope();
-                await scope.ServiceProvider.GetRequiredService<Camisa10DbContext>().Database.EnsureCreatedAsync(stoppingToken);
+                var ctx = scope.ServiceProvider.GetRequiredService<Camisa10DbContext>();
+                await ctx.Database.EnsureCreatedAsync(stoppingToken);
+                // carreiras de versões antigas ganham os campos novos (senão não abrem)
+                var mongoDb = new MongoClient(status.ConnectionString).GetDatabase(status.Database);
+                var upgraded = await DocumentUpgrader.UpgradeAsync(ctx, mongoDb, stoppingToken);
+                if (upgraded > 0) log.LogInformation("{Count} documentos antigos atualizados com os campos novos", upgraded);
                 status.Connected = true;
                 status.LastError = null;
                 log.LogInformation("MongoDB conectado em {Server}", status.Server);
