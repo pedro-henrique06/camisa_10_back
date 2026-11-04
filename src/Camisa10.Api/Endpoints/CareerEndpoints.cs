@@ -128,8 +128,37 @@ public static partial class CareerEndpoints
         // Mesa: amigos (para os duelos) e o calendário junto
         var mesa = career.MesaId == null ? null : await db.Mesas.AsNoTracking().FirstOrDefaultAsync(m => m.Id == career.MesaId, ct);
         var friends = mesa == null ? new() : await MesaService.Friends(db, mesa, career.Id, ct);
-        if (mesa != null && MesaService.Advances(career, req.Type) && MesaService.WaitingFor(mesa, career, friends) is { Count: > 0 } waiting)
+
+        // Avançar junto: no calendário, "Continuar" é o botão Pronto. Quem está atrás segue normal até alcançar os amigos.
+        if (mesa != null && MesaService.IsTurno(mesa) && career.Phase == GamePhase.Calendar && req.Type == ActionType.Continue
+            && !friends.Any(f => f.Career.Status == CareerStatus.Active && MesaService.Pace(f.Career) > MesaService.Pace(career)))
+        {
+            db.Entry(career).State = EntityState.Detached;
+            mesa = await MesaService.SetReady(db, mesa.Id, career, ct) ?? mesa;
+            friends = await MesaService.Friends(db, mesa, career.Id, ct);
+            if (MesaService.AllReady(mesa, career, friends))
+            {
+                var pace = MesaService.Pace(career);
+                var ids = friends.Where(f => f.Career.Status == CareerStatus.Active).Select(f => f.Career.Id).Prepend(career.Id).ToList();
+                // só um pedido vira a data (se dois apertarem juntos, o outro só vê o resultado)
+                if (await MesaService.ClaimTurn(db, mesa.Id, ids, pace, ct) is { } claimed)
+                {
+                    foreach (var cid in claimed) await AdvanceTurn(db, cid, pace, ct);
+                    var name = mesa.Members.FirstOrDefault(m => m.CareerId == career.Id)?.Name ?? career.Name;
+                    await MesaService.Post(db, mesa.Id, "✅", $"Todos prontos: a mesa seguiu para a próxima data (último: {name}).", ct);
+                }
+            }
+            var now = await Find(db, http, id, ct, tracking: false);
+            return TypedResults.Ok(await WithMesa(db, now!, ViewBuilder.Build(now!), ct));
+        }
+
+        if (mesa != null && !MesaService.IsTurno(mesa) && MesaService.Advances(career, req.Type) && MesaService.WaitingFor(mesa, career, friends) is { Count: > 0 } waiting)
             return TypedResults.Problem($"Esperando {string.Join(", ", waiting)} chegar nesta data para a mesa seguir junta.",
+                statusCode: StatusCodes.Status400BadRequest);
+        // no turno, a virada da temporada continua esperando quem está atrás
+        if (mesa != null && MesaService.IsTurno(mesa) && career.Phase != GamePhase.Calendar && MesaService.Advances(career, req.Type)
+            && MesaService.WaitingFor(mesa, career, friends) is { Count: > 0 } behind)
+            return TypedResults.Problem($"Esperando {string.Join(", ", behind)} fechar a temporada para a mesa seguir junta.",
                 statusCode: StatusCodes.Status400BadRequest);
 
         var before = MesaService.Snap(career);
@@ -166,14 +195,64 @@ public static partial class CareerEndpoints
             var fresh = await Find(db, http, id, ct, tracking: false);
             return TypedResults.Conflict(ViewBuilder.Build(fresh!));
         }
-        if (mesa != null)
-        {
-            await MesaService.Share(db, mesa.Id, career, ct);
-            if (career.PendingDuel != null) await MesaService.EnsureLeagueDuel(db, career, mesa, ct);
-            var name = mesa.Members.FirstOrDefault(m => m.CareerId == career.Id)?.Name ?? career.Name;
-            foreach (var (icon, text) in MesaService.News(name, before, career)) await MesaService.Post(db, mesa.Id, icon, text, ct);
-        }
+        if (mesa != null) await AfterSave(db, mesa, career, before, ct);
         return TypedResults.Ok(await WithMesa(db, career, ViewBuilder.Build(career), ct));
+    }
+
+    /// <summary>Depois de gravar a carreira de uma mesa: resultados para os amigos, duelo da liga e notícias no diário.</summary>
+    private static async Task AfterSave(Camisa10DbContext db, Mesa mesa, Career career, MesaService.Snapshot before, CancellationToken ct)
+    {
+        await MesaService.Share(db, mesa.Id, career, ct);
+        if (career.PendingDuel != null) await MesaService.EnsureLeagueDuel(db, career, mesa, ct);
+        var name = mesa.Members.FirstOrDefault(m => m.CareerId == career.Id)?.Name ?? career.Name;
+        foreach (var (icon, text) in MesaService.News(name, before, career)) await MesaService.Post(db, mesa.Id, icon, text, ct);
+    }
+
+    /// <summary>
+    /// Avançar junto: passa a data de uma carreira da mesa (todos apertaram Pronto). Cada carreira usa os
+    /// resultados que os amigos acabaram de gravar, e um documento é gravado por vez.
+    /// </summary>
+    private static async Task AdvanceTurn(Camisa10DbContext db, string careerId, int pace, CancellationToken ct)
+    {
+        for (var attempt = 0; attempt < 3; attempt++)
+        {
+            var c = await db.Careers.FirstOrDefaultAsync(x => x.Id == careerId, ct);
+            if (c == null || c.MesaId == null) return;
+            if (c.Phase != GamePhase.Calendar || c.Status != CareerStatus.Active || MesaService.Pace(c) != pace)
+            {
+                db.Entry(c).State = EntityState.Detached;
+                return;
+            }
+            var mesa = await db.Mesas.AsNoTracking().FirstOrDefaultAsync(m => m.Id == c.MesaId, ct);
+            if (mesa == null) return;
+            var friends = await MesaService.Friends(db, mesa, c.Id, ct);
+            var before = MesaService.Snap(c);
+            var engine = new GameEngine(c) { Mesa = MesaService.Context(mesa, friends) };
+            engine.SyncMesa();
+            try
+            {
+                engine.Act(new GameAction(ActionType.Continue));
+            }
+            catch (GameRuleException)
+            {
+                db.Entry(c).State = EntityState.Detached;
+                return;
+            }
+            c.Version++;
+            c.UpdatedAt = DateTime.UtcNow;
+            try
+            {
+                await db.SaveChangesAsync(ct);
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                db.Entry(c).State = EntityState.Detached;
+                continue;
+            }
+            db.Entry(c).State = EntityState.Detached;
+            await AfterSave(db, mesa, c, before, ct);
+            return;
+        }
     }
 
     private static async Task<Results<Ok<HistoryView>, NotFound>> GetHistory(HttpContext http, string id, Camisa10DbContext db, CancellationToken ct)

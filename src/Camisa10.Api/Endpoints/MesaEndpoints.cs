@@ -9,14 +9,15 @@ namespace Camisa10.Api.Endpoints;
 
 public record NewMesaRequest(string Name, string PlayerName);
 public record JoinMesaRequest(string Code, string PlayerName);
-public record SyncRequest(bool Sync);
+/// <param name="Mode">"livre", "junto" ou "turno" (avançar junto). Sem ele, vale o <c>Sync</c> (junto ou livre).</param>
+public record SyncRequest(bool Sync, string? Mode = null);
 /// <summary>Amigo desafiado, pelo id dele na mesa (<see cref="MesaMemberView.MemberId"/>).</summary>
 public record ChallengeRequest(string OpponentMemberId);
 public record DuelChoiceRequest(int Index);
 
 /// <summary>Mesa vista por um amigo: participantes, carreiras, diário e duelos.</summary>
 public record MesaView(string Id, string Code, string Name, bool Sync, bool IsOwner, IReadOnlyList<MesaMemberView> Members,
-    IReadOnlyList<MesaFeedItem> Feed, IReadOnlyList<DuelSummary> Duels);
+    IReadOnlyList<MesaFeedItem> Feed, IReadOnlyList<DuelSummary> Duels, string Mode = "junto");
 
 /// <summary>MemberId identifica o amigo só nesta mesa (o id de jogador dele não sai do servidor).</summary>
 public record MesaMemberView(string MemberId, string Name, bool Me, string? CareerId, MesaFriendView? Career, Badge? Badge, int Titles, int Goals);
@@ -149,8 +150,21 @@ public static class MesaEndpoints
         var mesa = await db.Mesas.FirstOrDefaultAsync(m => m.Id == id, ct);
         if (mesa == null || !mesa.MemberIds.Contains(me)) return TypedResults.NotFound();
         if (mesa.OwnerPlayerId != me) return TypedResults.Problem("Só quem criou a mesa muda o ritmo.", statusCode: 403);
-        mesa.Sync = req.Sync;
-        mesa.Feed.Add(new MesaFeedItem { Icon = "⏱", Text = req.Sync ? "A mesa voltou a jogar com o calendário junto." : "A mesa agora joga no ritmo de cada um." });
+        var mode = req.Mode is "livre" or "junto" or "turno" ? req.Mode : req.Sync ? "junto" : "livre";
+        if (MesaService.ModeOf(mesa) == mode) return TypedResults.Ok(await View(db, mesa, me, ct));
+        mesa.Sync = mode != "livre";
+        if (mode != "livre") mesa.Mode = mode;
+        mesa.ReadyCareers.Clear();
+        mesa.Feed.Add(new MesaFeedItem
+        {
+            Icon = "⏱",
+            Text = mode switch
+            {
+                "turno" => "A mesa agora avança junto: a data só passa quando todos apertarem Pronto.",
+                "junto" => "A mesa voltou a jogar com o calendário junto.",
+                _ => "A mesa agora joga no ritmo de cada um."
+            }
+        });
         mesa.Version++;
         await db.SaveChangesAsync(ct);
         return TypedResults.Ok(await View(db, mesa, me, ct));
@@ -209,7 +223,7 @@ public static class MesaEndpoints
                 d.Home.Goals, d.Away.Goals, d.Finished, side != null, myTurn, d.CreatedAt);
         }).ToList();
         var feed = mesa.Feed.AsEnumerable().Reverse().Take(30).ToList();
-        return new MesaView(mesa.Id, mesa.Code, mesa.Name, mesa.Sync, mesa.OwnerPlayerId == me, members, feed, summaries);
+        return new MesaView(mesa.Id, mesa.Code, mesa.Name, mesa.Sync, mesa.OwnerPlayerId == me, members, feed, summaries, MesaService.ModeOf(mesa));
     }
 
     // ---------------------------------------------------------------- duelos

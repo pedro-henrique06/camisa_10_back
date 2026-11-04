@@ -299,6 +299,93 @@ public class MesaIntegrationTests : IDisposable
     }
 
     /// <summary>Uma ação de bot na carreira. Nulo = a mesa mandou esperar o amigo.</summary>
+    [MongoFact]
+    public async Task Avancar_junto_so_passa_a_data_quando_todos_apertam_pronto()
+    {
+        var ana = Client("player-turno-ana");
+        var beto = Client("player-turno-beto");
+        var created = await Json_(await ana.PostAsJsonAsync("/api/mesas", new { name = "Turno", playerName = "Ana" }));
+        var mesaId = created.GetProperty("id").GetString()!;
+        await beto.PostAsJsonAsync("/api/mesas/join", new { code = created.GetProperty("code").GetString(), playerName = "Beto" });
+        // só quem criou muda o modo
+        Assert.Equal(HttpStatusCode.Forbidden, (await beto.PostAsJsonAsync($"/api/mesas/{mesaId}/sync", new { sync = true, mode = "turno" })).StatusCode);
+        var turno = await Json_(await ana.PostAsJsonAsync($"/api/mesas/{mesaId}/sync", new { sync = true, mode = "turno" }));
+        Assert.Equal("turno", turno.GetProperty("mode").GetString());
+
+        var ids = new[]
+        {
+            (await Json_(await ana.PostAsJsonAsync($"/api/mesas/{mesaId}/careers", new { name = "Ana", club = "Palmeiras", nation = "Brasil", position = "Atacante" }))).GetProperty("id").GetString()!,
+            (await Json_(await beto.PostAsJsonAsync($"/api/mesas/{mesaId}/careers", new { name = "Beto", club = "Santos", nation = "Brasil", position = "Meia" }))).GetProperty("id").GetString()!
+        };
+        var clients = new[] { ana, beto };
+        var rng = new Random(9);
+        async Task<JsonElement> View(int who) => await Json_(await clients[who].GetAsync($"/api/careers/{ids[who]}"));
+        static int Pace(JsonElement v)
+        {
+            var me = v.GetProperty("mesa").GetProperty("friends").EnumerateArray().First(f => f.GetProperty("me").GetBoolean());
+            return me.GetProperty("season").GetInt32() * 100 + me.GetProperty("seasonDay").GetInt32();
+        }
+
+        var turns = 0;
+        for (var round = 0; round < 400 && turns < 8; round++)
+        {
+            // cada um resolve o dia até voltar ao calendário
+            for (var who = 0; who < 2; who++)
+            {
+                for (var i = 0; i < 40; i++)
+                {
+                    var v = await View(who);
+                    if (v.GetProperty("phase").GetString() == "Calendar" || v.GetProperty("status").GetString() == "Finished") break;
+                    if (await Act(clients[who], ids[who], v, rng) == null) break;
+                }
+            }
+            var a = await View(0);
+            var b = await View(1);
+            if (a.GetProperty("phase").GetString() != "Calendar" || b.GetProperty("phase").GetString() != "Calendar") continue;
+            Assert.Equal(Pace(a), Pace(b));
+            var start = Pace(a);
+
+            if (turns % 2 == 1)
+            {
+                // os dois apertam Pronto ao mesmo tempo: a data passa uma vez só para cada um
+                var va = a.GetProperty("version").GetInt32();
+                var vb = b.GetProperty("version").GetInt32();
+                await Task.WhenAll(
+                    ana.PostAsJsonAsync($"/api/careers/{ids[0]}/actions", new { type = "Continue", version = va }),
+                    beto.PostAsJsonAsync($"/api/careers/{ids[1]}/actions", new { type = "Continue", version = vb }));
+                var pa = await View(0);
+                var pb = await View(1);
+                Assert.Equal(va + 1, pa.GetProperty("version").GetInt32());
+                Assert.Equal(vb + 1, pb.GetProperty("version").GetInt32());
+                Assert.Equal(Pace(pa), Pace(pb));
+                Assert.True(Pace(pa) > start);
+                turns++;
+                continue;
+            }
+
+            // Ana aperta Pronto: fica esperando o Beto, e a data não passa (nem apertando de novo)
+            var r1 = await Json_(await ana.PostAsJsonAsync($"/api/careers/{ids[0]}/actions", new { type = "Continue", version = a.GetProperty("version").GetInt32() }));
+            Assert.Equal(start, Pace(r1));
+            Assert.True(r1.GetProperty("mesa").GetProperty("ready").GetBoolean());
+            Assert.Equal("Beto", r1.GetProperty("mesa").GetProperty("waitingFor")[0].GetString());
+            var again = await Json_(await ana.PostAsJsonAsync($"/api/careers/{ids[0]}/actions", new { type = "Continue", version = r1.GetProperty("version").GetInt32() }));
+            Assert.Equal(start, Pace(again));
+            Assert.Equal(start, Pace(await View(1)));
+
+            // Beto aperta Pronto: a data passa para os dois de uma vez
+            var r2 = await Json_(await beto.PostAsJsonAsync($"/api/careers/{ids[1]}/actions", new { type = "Continue", version = b.GetProperty("version").GetInt32() }));
+            var a2 = await View(0);
+            Assert.True(Pace(a2) > start, "a data da Ana também passou");
+            Assert.True(Pace(r2) > start, "a data do Beto passou");
+            Assert.Equal(Pace(a2), Pace(r2));
+            Assert.False(a2.GetProperty("mesa").GetProperty("ready").GetBoolean());
+            turns++;
+        }
+        Assert.True(turns >= 8, $"turnos jogados: {turns}");
+        var mesa = await Json_(await ana.GetAsync($"/api/mesas/{mesaId}"));
+        Assert.Contains(mesa.GetProperty("feed").EnumerateArray(), f => f.GetProperty("text").GetString()!.StartsWith("Todos prontos"));
+    }
+
     private static async Task<JsonElement?> Act(HttpClient http, string id, JsonElement v, Random rng)
     {
         if (v.GetProperty("status").GetString() == "Finished") return null;

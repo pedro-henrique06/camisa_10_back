@@ -98,6 +98,83 @@ public static class MesaService
         !mesa.Sync ? new() : friends.Where(f => f.Career.Status == CareerStatus.Active && Pace(f.Career) < Pace(me))
             .Select(f => f.Member.Name).ToList();
 
+    // ---------------------------------------------------------------- avançar junto (botão Pronto)
+    public static string ModeOf(Mesa mesa) => !mesa.Sync ? "livre" : mesa.Mode == "turno" ? "turno" : "junto";
+
+    public static bool IsTurno(Mesa mesa) => ModeOf(mesa) == "turno";
+
+    private static string ReadyKey(Career c) => $"{c.Id}@{Pace(c)}";
+
+    /// <summary>Apertou Pronto nesta data (e ainda está no calendário dela).</summary>
+    public static bool IsReady(Mesa mesa, Career c) =>
+        c.Phase == GamePhase.Calendar && c.Status == CareerStatus.Active && mesa.ReadyCareers.Contains(ReadyKey(c));
+
+    /// <summary>Todos os amigos ativos estão na mesma data do jogador e já apertaram Pronto.</summary>
+    public static bool AllReady(Mesa mesa, Career me, List<(MesaMember Member, Career Career)> friends) =>
+        IsReady(mesa, me) && friends.Where(f => f.Career.Status == CareerStatus.Active)
+            .All(f => Pace(f.Career) == Pace(me) && IsReady(mesa, f.Career));
+
+    /// <summary>No modo turno: quem falta (atrasado ou ainda sem apertar Pronto).</summary>
+    public static List<string> NotReady(Mesa mesa, Career me, List<(MesaMember Member, Career Career)> friends) =>
+        friends.Where(f => f.Career.Status == CareerStatus.Active && !(Pace(f.Career) == Pace(me) && IsReady(mesa, f.Career)))
+            .Select(f => f.Member.Name).ToList();
+
+    /// <summary>Marca (ou desmarca) o Pronto do jogador na mesa e devolve a mesa atualizada.</summary>
+    public static async Task<Mesa?> SetReady(Camisa10DbContext db, string mesaId, Career c, CancellationToken ct)
+    {
+        for (var attempt = 0; attempt < 5; attempt++)
+        {
+            var mesa = await db.Mesas.FirstOrDefaultAsync(m => m.Id == mesaId, ct);
+            if (mesa == null) return null;
+            var key = ReadyKey(c);
+            mesa.ReadyCareers.RemoveAll(x => x.StartsWith(c.Id + "@", StringComparison.Ordinal));
+            mesa.ReadyCareers.Add(key);
+            mesa.Version++;
+            try
+            {
+                await db.SaveChangesAsync(ct);
+                db.Entry(mesa).State = EntityState.Detached;
+                return mesa;
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                db.Entry(mesa).State = EntityState.Detached;
+            }
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Reserva a virada da data: tira da mesa os Prontos desta data. Só um pedido consegue (versão da mesa),
+    /// então a data não passa duas vezes quando dois amigos apertam Pronto juntos.
+    /// </summary>
+    public static async Task<List<string>?> ClaimTurn(Camisa10DbContext db, string mesaId, IReadOnlyCollection<string> careerIds, int pace, CancellationToken ct)
+    {
+        var mesa = await db.Mesas.FirstOrDefaultAsync(m => m.Id == mesaId, ct);
+        if (mesa == null) return null;
+        var keys = careerIds.Select(id => $"{id}@{pace}").ToList();
+        if (!keys.All(mesa.ReadyCareers.Contains))
+        {
+            db.Entry(mesa).State = EntityState.Detached;
+            return null;
+        }
+        mesa.ReadyCareers.RemoveAll(keys.Contains);
+        mesa.Version++;
+        try
+        {
+            await db.SaveChangesAsync(ct);
+            return careerIds.ToList();
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return null;
+        }
+        finally
+        {
+            db.Entry(mesa).State = EntityState.Detached;
+        }
+    }
+
     /// <summary>A ação faz a carreira passar de data (ou de temporada)?</summary>
     public static bool Advances(Career c, ActionType type) =>
         type == ActionType.Continue && c.Phase is GamePhase.Calendar or GamePhase.SeasonSummary or GamePhase.Promotion or GamePhase.Decision;
@@ -107,7 +184,17 @@ public static class MesaService
         var list = friends.Select(f => Friend(f.Member, f.Career, false)).ToList();
         var mine = mesa.Members.FirstOrDefault(m => m.CareerId == me.Id);
         list.Insert(0, Friend(mine ?? new MesaMember { Name = me.Name }, me, true));
-        return new MesaStatusView(mesa.Id, mesa.Name, mesa.Code, mesa.Sync, WaitingFor(mesa, me, friends), list);
+        var mode = ModeOf(mesa);
+        if (mode == "turno")
+        {
+            // no turno a lista mostra quem já está pronto; "esperando" só depois de apertar Pronto
+            list = friends.Select(f => Friend(f.Member, f.Career, false) with { Ready = IsReady(mesa, f.Career) && Pace(f.Career) == Pace(me) }).ToList();
+            list.Insert(0, Friend(mine ?? new MesaMember { Name = me.Name }, me, true) with { Ready = IsReady(mesa, me) });
+            var ready = IsReady(mesa, me);
+            var waiting = me.Phase == GamePhase.Calendar ? (ready ? NotReady(mesa, me, friends) : new List<string>()) : WaitingFor(mesa, me, friends);
+            return new MesaStatusView(mesa.Id, mesa.Name, mesa.Code, mesa.Sync, waiting, list, mode, ready);
+        }
+        return new MesaStatusView(mesa.Id, mesa.Name, mesa.Code, mesa.Sync, WaitingFor(mesa, me, friends), list, mode);
     }
 
     public static MesaFriendView Friend(MesaMember m, Career c, bool me)
