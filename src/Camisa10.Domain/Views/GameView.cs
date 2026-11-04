@@ -198,9 +198,19 @@ public record OfferView(
     int Sessions,
     string FocusName,
     string? League,
-    string? Division);
+    string? Division,
+    int Contract = 3,
+    bool Pitched = false,
+    string? Note = null);
 
-public record MarketView(string Mode, string Intro, double ReleaseClause, IReadOnlyList<OfferView> Offers, string StayLabel);
+/// <param name="PitchesLeft">Quantos clubes o jogador ainda pode procurar nesta janela.</param>
+/// <param name="Pitch">Resposta do último clube procurado.</param>
+/// <param name="Asks">Pedidos de salário para se oferecer (0 menos, 1 normal, 2 mais).</param>
+public record MarketView(string Mode, string Intro, double ReleaseClause, IReadOnlyList<OfferView> Offers, string StayLabel,
+    int PitchesLeft, PitchView? Pitch, IReadOnlyList<string> Asks);
+
+/// <param name="Verdict">"accept", "counter" ou "reject".</param>
+public record PitchView(string? ClubId, string Club, Badge Badge, int Tier, string Verdict, string Title, string Text);
 
 public record SwapView(string Current, string Suggested);
 

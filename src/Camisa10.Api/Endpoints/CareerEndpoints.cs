@@ -148,7 +148,7 @@ public static partial class CareerEndpoints
                 var side = duel.Home.CareerId == career.Id ? "home" : "away";
                 engine.FinishDuel(new DuelEngine(duel).OutcomeFor(side));
             }
-            else engine.Act(new GameAction(req.Type, req.Index, req.Power));
+            else engine.Act(new GameAction(req.Type, req.Index, req.Power, req.ClubId));
         }
         catch (GameRuleException e)
         {

@@ -126,6 +126,10 @@ public sealed partial class GameEngine
                 if (s.MarketMode == "bt") Back(); else Stay();
                 return;
 
+            case ActionType.Offer:
+                Pitch(action.ClubId ?? throw new GameRuleException("Escolha o clube."), action.Index ?? 1);
+                return;
+
             case ActionType.SearchClub:
                 if (!CanSearchClub()) throw new GameRuleException("A janela de transferências não está aberta agora.");
                 s.ReturnPhase = s.Phase;
@@ -883,7 +887,7 @@ public sealed partial class GameEngine
                     Success = new Fx
                     {
                         NewClub = x.Club, NewClubId = x.ClubId, NewClubTier = x.Tier, Money = x.SigningBonus, Salary = x.Salary,
-                        Morale = 4, Trust = -6, Agent = s.Has("emp") ? 4 : 0, Contract = 3
+                        Morale = 4, Trust = -6, Agent = s.Has("emp") ? 4 : 0, Contract = x.Contract
                     }
                 }
             }
@@ -924,6 +928,7 @@ public sealed partial class GameEngine
     {
         s.MarketOffers = new List<MarketOffer>();
         s.MarketMode = null;
+        s.LastPitch = null;
         s.ReturnPhase = null;
     }
 
@@ -1162,10 +1167,13 @@ public enum ActionType
     /// <summary>Abrir o mercado pelo botão "Procurar clube".</summary>
     SearchClub,
     /// <summary>Pendurar as chuteiras na tela de decisão.</summary>
-    Retire
+    Retire,
+    /// <summary>No mercado: oferecer-se ao clube <see cref="GameAction.ClubId"/>, pedindo o salário <see cref="GameAction.Index"/> (0 menos, 1 normal, 2 mais).</summary>
+    Offer
 }
 
 /// <param name="Power">Força da barra no pênalti (0 a 100).</param>
-public record GameAction(ActionType Type, int? Index = null, int? Power = null);
+/// <param name="ClubId">Clube a que o jogador se oferece (ação Offer).</param>
+public record GameAction(ActionType Type, int? Index = null, int? Power = null, string? ClubId = null);
 
 public sealed class GameRuleException(string message) : Exception(message);
