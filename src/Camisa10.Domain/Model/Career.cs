@@ -101,6 +101,16 @@ public class Career
     public string? CalendarType { get; set; }
     /// <summary>Jogo do dia (placar, adversário e narração), para o campo animado.</summary>
     public MatchState? Match { get; set; }
+    /// <summary>Tabela da liga do clube na temporada, atualizada a cada rodada.</summary>
+    public List<LeagueRow> LeagueTable { get; set; } = new();
+    /// <summary>Liga da tabela (país|divisão|temporada); muda quando o jogador troca de liga.</summary>
+    public string? LeagueTableKey { get; set; }
+    /// <summary>Rodadas da liga já jogadas.</summary>
+    public int LeagueRound { get; set; }
+    /// <summary>Jogos do jogador na temporada (placar, gols, assistências e nota).</summary>
+    public List<MatchRecord> SeasonMatches { get; set; } = new();
+    /// <summary>Sala de troféus: cada título com a temporada, a idade e o time.</summary>
+    public List<Trophy> Trophies { get; set; } = new();
 
     // ----- Estatísticas -----
     public int SeasonGoals { get; set; }
@@ -254,6 +264,38 @@ public class Competition
     public double Bonus { get; set; }
     /// <summary>Como terminou: "Campeão", "Fase de grupos", "Quartas"...</summary>
     public string? Result { get; set; }
+    /// <summary>Fases de mata-mata (oitavas a final = 4).</summary>
+    public int KoRounds { get; set; }
+    /// <summary>Torneio da seleção: força da seleção e jogos em sequência depois da temporada.</summary>
+    public double? Strength { get; set; }
+    public bool Sequential { get; set; }
+    /// <summary>Grupo do time do jogador (4 times; os 2 primeiros se classificam).</summary>
+    public string? GroupName { get; set; }
+    public List<LeagueRow> Group { get; set; } = new();
+    /// <summary>Chaveamento do mata-mata, fase por fase.</summary>
+    public List<BracketRound> Bracket { get; set; } = new();
+}
+
+/// <summary>Uma fase do mata-mata (ex.: "Quartas") e seus confrontos.</summary>
+public class BracketRound
+{
+    public string Name { get; set; } = "";
+    public List<BracketTie> Ties { get; set; } = new();
+}
+
+/// <summary>Confronto do mata-mata. Sem visitante = o mandante passa direto.</summary>
+public class BracketTie
+{
+    public string HomeId { get; set; } = "";
+    public string Home { get; set; } = "";
+    public string? AwayId { get; set; }
+    public string? Away { get; set; }
+    public int? HomeGoals { get; set; }
+    public int? AwayGoals { get; set; }
+    public string? WinnerId { get; set; }
+    /// <summary>Decidido nos pênaltis.</summary>
+    public bool Penalties { get; set; }
+    public bool Mine { get; set; }
 }
 
 /// <summary>Jogo em andamento: placar, adversário e o que o narrador já contou.</summary>
@@ -271,6 +313,13 @@ public class MatchState
     public int For { get; set; }
     public int Against { get; set; }
     public int Minute { get; set; }
+    /// <summary>Rodada da liga (0 em diante) quando o jogo é da liga.</summary>
+    public int Round { get; set; } = -1;
+    /// <summary>Gols, assistências e decisões certas e erradas do jogador neste jogo (para a nota).</summary>
+    public int MyGoals { get; set; }
+    public int MyAssists { get; set; }
+    public int Good { get; set; }
+    public int Bad { get; set; }
     public bool Final { get; set; }
     public List<MatchLine> Feed { get; set; } = new();
     /// <summary>Onde começa, no <see cref="Feed"/>, o trecho mostrado antes do lance atual.</summary>
@@ -316,6 +365,49 @@ public class ClubSeasonResult
     public int Division { get; set; }
     public int Rank { get; set; }
     public int Size { get; set; }
+    /// <summary>Classificação final da liga (ids, do 1º ao último), para o acesso e rebaixamento do mundo.</summary>
+    public List<string> Order { get; set; } = new();
+}
+
+/// <summary>Linha da tabela da liga.</summary>
+public class LeagueRow
+{
+    public string ClubId { get; set; } = "";
+    public string Club { get; set; } = "";
+    public int Played { get; set; }
+    public int Won { get; set; }
+    public int Drawn { get; set; }
+    public int Lost { get; set; }
+    public int GoalsFor { get; set; }
+    public int GoalsAgainst { get; set; }
+    public int Points { get; set; }
+}
+
+/// <summary>Um título da carreira.</summary>
+public class Trophy
+{
+    public string Name { get; set; } = "";
+    /// <summary>league, state, cup, continental, national ou award (Bola de Ouro).</summary>
+    public string Kind { get; set; } = "";
+    public int Season { get; set; }
+    public int Age { get; set; }
+    /// <summary>Clube (ou seleção) com que o título foi conquistado.</summary>
+    public string Team { get; set; } = "";
+}
+
+/// <summary>Um jogo do jogador na temporada.</summary>
+public class MatchRecord
+{
+    public int Turn { get; set; }
+    public string Kind { get; set; } = "";
+    public string Competition { get; set; } = "";
+    public string Opponent { get; set; } = "";
+    public bool Home { get; set; }
+    public int For { get; set; }
+    public int Against { get; set; }
+    public int Goals { get; set; }
+    public int Assists { get; set; }
+    public double Rating { get; set; }
 }
 
 public class TableRow
@@ -325,6 +417,13 @@ public class TableRow
     public bool Mine { get; set; }
     /// <summary>"up" (sobe), "down" (cai) ou nulo.</summary>
     public string? Zone { get; set; }
+    public int Played { get; set; }
+    public int Won { get; set; }
+    public int Drawn { get; set; }
+    public int Lost { get; set; }
+    public int GoalsFor { get; set; }
+    public int GoalsAgainst { get; set; }
+    public int Points { get; set; }
 }
 
 public class MarketOffer
@@ -408,4 +507,6 @@ public class SeasonReport
     public List<TableRow> Table { get; set; } = new();
     /// <summary>Copas da temporada (estadual, copa nacional, continental).</summary>
     public List<CompetitionResult> Cups { get; set; } = new();
+    /// <summary>Jogos da temporada, na ordem.</summary>
+    public List<MatchRecord> Matches { get; set; } = new();
 }

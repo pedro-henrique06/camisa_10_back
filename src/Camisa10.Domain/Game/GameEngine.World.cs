@@ -134,33 +134,39 @@ public sealed partial class GameEngine
 
     // ---------------------------------------------------------------- fim da temporada na liga
     /// <summary>
-    /// Posição final do clube na liga: parte da força do clube na tabela simulada e
-    /// melhora ou piora com o desempenho do jogador. Grava o resultado para o acesso e rebaixamento.
+    /// Fim da liga: completa as rodadas que faltarem e fecha a tabela. No profissional, grava a
+    /// classificação inteira para o acesso e o rebaixamento do mundo.
     /// </summary>
-    private (int Rank, int Size, string? Movement, List<TableRow> Table) FinishLeague(double perf, bool titleBonus)
+    private (int Rank, int Size, string? Movement, List<TableRow> Table)? FinishLeague()
     {
-        var layout = Layout();
-        var p = layout.Of(s.ClubId)!.Value;
-        var ids = layout.Leagues[p.Iso][p.Division];
-        var size = ids.Count;
-        var expected = WorldSim.ExpectedPosition(s.WorldSeed, s.Season, s.ClubSeasons, s.ClubId!);
-        var rank = Clamp(expected - Round((perf - 78) / 8.0) + R(-2, 2) - (titleBonus ? 2 : 0), 1, size);
-
-        s.ClubSeasons.RemoveAll(r => r.Season == s.Season);
-        s.ClubSeasons.Add(new ClubSeasonResult { Season = s.Season, ClubId = s.ClubId!, Division = p.Division, Rank = rank, Size = size });
-
+        if (CurrentLeague() is not { } lg) return null;
+        CatchUpLeague(CompetitionOf("league")?.Days.Count ?? 0);
+        if (s.LeagueTable.Count == 0) return null;
+        var sorted = Sorted(s.LeagueTable);
+        var size = sorted.Count;
+        var rank = sorted.FindIndex(r => r.ClubId == MyLeagueClubId) + 1;
         var k = WorldSim.Swaps(size);
+        var d = lg.Division;
         string? movement = null;
-        if (p.Division > 0 && rank <= k) movement = "up";
-        else if (p.Division < 2 && rank > size - k) movement = "down";
-
-        var standings = WorldSim.Standings(s.WorldSeed, s.Season, s.ClubSeasons, p.Iso, p.Division);
-        var table = standings.Select(r => new TableRow
+        if (!s.Base)
         {
-            Position = r.Position,
+            s.ClubSeasons.RemoveAll(r => r.Season == s.Season);
+            s.ClubSeasons.Add(new ClubSeasonResult
+            {
+                Season = s.Season, ClubId = MyLeagueClubId, Division = d, Rank = rank, Size = size,
+                Order = sorted.Select(r => r.ClubId).ToList()
+            });
+            if (d > 0 && rank <= k) movement = "up";
+            else if (d < 2 && rank > size - k) movement = "down";
+        }
+        var table = sorted.Select((r, i) => new TableRow
+        {
+            Position = i + 1,
             Club = r.Club,
-            Mine = r.ClubId == s.ClubId,
-            Zone = p.Division > 0 && r.Position <= k ? "up" : p.Division < 2 && r.Position > size - k ? "down" : null
+            Mine = r.ClubId == MyLeagueClubId,
+            Zone = s.Base ? null : d > 0 && i < k ? "up" : d < 2 && i >= size - k ? "down" : null,
+            Played = r.Played, Won = r.Won, Drawn = r.Drawn, Lost = r.Lost,
+            GoalsFor = r.GoalsFor, GoalsAgainst = r.GoalsAgainst, Points = r.Points
         }).ToList();
         return (rank, size, movement, table);
     }

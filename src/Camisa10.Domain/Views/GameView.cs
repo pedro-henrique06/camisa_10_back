@@ -62,7 +62,18 @@ public record HudView(
     /// <summary>Competição de cada dia da temporada (20 posições; nulo = sem jogo).</summary>
     IReadOnlyList<string?> MatchDays,
     /// <summary>Data atual da temporada (ex.: "18 de janeiro"); nula antes da primeira.</summary>
-    string? Date);
+    string? Date,
+    /// <summary>Posição do clube na tabela ao vivo (0 sem tabela) e quantos clubes tem a liga.</summary>
+    int LeaguePosition,
+    int LeagueSize,
+    /// <summary>Sala de troféus: títulos agrupados por competição.</summary>
+    TrophyRoomView Trophies);
+
+/// <summary>Títulos da carreira. Untracked = títulos de antes da sala de troféus (carreiras antigas).</summary>
+public record TrophyRoomView(int Titles, int NationalTitles, int Ballons, int Untracked, IReadOnlyList<TrophyGroupView> Groups);
+
+/// <summary>Uma competição vencida: quantas vezes, e cada conquista (temporada, idade, time).</summary>
+public record TrophyGroupView(string Name, string Kind, int Count, IReadOnlyList<Trophy> Wins);
 
 /// <summary>Barra da competição. Kind: league, state, cup, continental ou national (cor no app).</summary>
 public record CompetitionView(string Name, string Subtitle, string Kind);
@@ -117,6 +128,22 @@ public record ResultView(string Title, string Chosen, string Text, bool Success,
 /// <summary>Dia do calendário. <see cref="Kind"/> é a competição do jogo do dia (league, state, cup, continental).</summary>
 public record CalendarCell(int Day, bool Done, bool Match, bool Window, string? Kind, string? Competition, int Month, int DayOfMonth, string MonthLabel);
 
+/// <summary>Uma copa: o grupo do time do jogador (os 2 primeiros passam) e a chave do mata-mata.</summary>
+public record CupView(string Kind, string Name, string Status, bool Out, bool Champion, string? GroupName,
+    IReadOnlyList<TableRow> Group, IReadOnlyList<BracketRoundView> Bracket);
+
+/// <summary>Fase do mata-mata. Current = a fase do próximo jogo do jogador. Fases futuras vêm com "A definir".</summary>
+public record BracketRoundView(string Name, bool Current, IReadOnlyList<BracketTieView> Ties);
+
+/// <summary>Confronto. Winner: "home", "away" ou nulo (ainda não jogado).</summary>
+public record BracketTieView(string Home, string? Away, int? HomeGoals, int? AwayGoals, string? Winner, bool Penalties, bool Mine);
+
+/// <summary>Tabela da liga durante a temporada.</summary>
+public record LiveTableView(string League, int Round, int Rounds, int Position, IReadOnlyList<TableRow> Rows, IReadOnlyList<MatchSummary> Recent);
+
+/// <summary>Um jogo já disputado: placar, gols e nota do jogador. Result: V, E ou D.</summary>
+public record MatchSummary(string Kind, string Competition, string Opponent, bool Home, int For, int Against, int Goals, int Assists, double Rating, string Result);
+
 /// <summary>Legenda do calendário: uma competição da temporada e como ela está.</summary>
 public record CompetitionLegend(string Kind, string Name, string Status, bool Out, bool Champion, int Games);
 
@@ -137,6 +164,10 @@ public record CalendarView(
     /// <summary>Data da próxima rodada (ex.: "29 de março").</summary>
     string NextDate,
     int Total,
+    /// <summary>Tabela da liga ao vivo e os últimos jogos.</summary>
+    LiveTableView? Table,
+    /// <summary>Copas da temporada: grupo e chaveamento.</summary>
+    IReadOnlyList<CupView> Cups,
     /// <summary>Ex.: "Temporada de janeiro a dezembro".</summary>
     string SeasonSpan);
 

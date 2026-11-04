@@ -21,7 +21,8 @@ public static class ViewBuilder
             Hud(s, engine),
             s.Phase is GamePhase.Event or GamePhase.Penalty && s.Current != null ? Event(s, engine, s.Current) : null,
             s.Phase == GamePhase.Result && s.LastResult != null ? Result(s, s.LastResult) : null,
-            s.Phase == GamePhase.Calendar ? Calendar(s, engine) : null,
+            // calendário e tabela vão em todas as fases, para as abas do app (Calendário, Tabela)
+            s.Status == CareerStatus.Active && s.Season > 0 ? Calendar(s, engine) : null,
             s.Phase == GamePhase.Market ? Market(s) : null,
             s.Phase == GamePhase.Swap ? new SwapView(s.Position, s.SwapTarget ?? s.Position) : null,
             s.Phase == GamePhase.Promotion ? new PromotionView(s.Club, BadgeFor(s.Club)) : null,
@@ -59,11 +60,86 @@ public static class ViewBuilder
             s.Money, s.Salary, s.Overall,
             GameData.BarLabels.Select(b => new BarView(b.Key, b.Label, values[b.Key])).ToList(),
             AttributeViews(s),
-            s.Goals + s.SeasonGoals, s.Assists + s.SeasonAssists, s.SeasonGoals, s.SeasonAssists,
+            s.Goals + SeasonGoals(s), s.Assists + SeasonAssists(s), SeasonGoals(s), SeasonAssists(s),
             warnings,
             s.Status == CareerStatus.Active && engine.CanSearchClub(),
             Enumerable.Range(1, GameEngine.SeasonDays).Select(n => s.Competitions.FirstOrDefault(c => c.Days.Contains(n))?.Kind).ToList(),
-            s.SeasonDay >= 1 ? SeasonCalendar.Label(SeasonCalendar.At(s.CalendarType, s.SeasonDay)) : null);
+            s.SeasonDay >= 1 ? SeasonCalendar.Label(SeasonCalendar.At(s.CalendarType, s.SeasonDay)) : null,
+            engine.LeaguePosition(), s.LeagueTable.Count, TrophyRoom(s));
+    }
+
+    /// <summary>Ordem das competições na sala de troféus: prêmios, seleção, continental, liga, copa, estadual.</summary>
+    private static readonly string[] TrophyOrder = { "award", "national", "continental", "league", "cup", "state" };
+
+    private static TrophyRoomView TrophyRoom(Career s)
+    {
+        var groups = s.Trophies
+            .GroupBy(x => (x.Name, x.Kind))
+            .Select(g => new TrophyGroupView(g.Key.Name, g.Key.Kind, g.Count(), g.OrderBy(x => x.Season).ToList()))
+            .OrderBy(g => Array.IndexOf(TrophyOrder, g.Kind) is var i && i < 0 ? 99 : i)
+            .ThenByDescending(g => g.Count)
+            .ToList();
+        var tracked = s.Trophies.Count(x => x.Kind != "award");
+        return new TrophyRoomView(s.Titles, s.NationalTitles, s.Ballons, Math.Max(0, s.Titles - tracked), groups);
+    }
+
+    /// <summary>Jogo em andamento (ainda sem apito final) desta data.</summary>
+    private static MatchState? LiveMatch(Career s) => s.Match is { Final: false } m && m.Turn == s.SeasonDay ? m : null;
+
+    /// <summary>Gols da temporada: dos jogos já terminados e do jogo em andamento.</summary>
+    private static int SeasonGoals(Career s) => s.SeasonMatches.Sum(x => x.Goals) + (LiveMatch(s)?.MyGoals ?? 0);
+
+    private static int SeasonAssists(Career s) => s.SeasonMatches.Sum(x => x.Assists) + (LiveMatch(s)?.MyAssists ?? 0);
+
+    /// <summary>Grupo e chave de cada copa (as fases que faltam aparecem como "A definir").</summary>
+    private static List<CupView> Cups(Career s) => s.Competitions
+        .Where(c => c.Kind != "league" && (c.Group.Count > 0 || c.Bracket.Count > 0))
+        .Select(c =>
+        {
+            var group = GameEngine.Sorted(c.Group).Select((r, i) => new TableRow
+            {
+                Position = i + 1, Club = r.Club, Mine = i >= 0 && r.ClubId == c.Group[0].ClubId,
+                Zone = i < 2 ? "up" : null,
+                Played = r.Played, Won = r.Won, Drawn = r.Drawn, Lost = r.Lost,
+                GoalsFor = r.GoalsFor, GoalsAgainst = r.GoalsAgainst, Points = r.Points
+            }).ToList();
+            var current = c.Out || c.Champion ? -1 : c.Played - c.GroupGames;
+            var rounds = c.Bracket.Select((r, k) => new BracketRoundView(r.Name, k == current,
+                r.Ties.Select(t => new BracketTieView(t.Home, t.Away ?? (t.AwayId == null ? "folga" : null), t.HomeGoals, t.AwayGoals,
+                    t.WinnerId == null ? null : t.WinnerId == t.HomeId ? "home" : "away", t.Penalties, t.Mine)).ToList())).ToList();
+            // fases que ainda não têm confrontos
+            var ties = c.Bracket.Count > 0 ? c.Bracket[^1].Ties.Count : 1 << Math.Max(0, c.KoRounds - 1);
+            for (var k = c.Bracket.Count; k < c.KoRounds; k++)
+            {
+                if (k > 0) ties = Math.Max(1, (ties + 1) / 2);
+                rounds.Add(new BracketRoundView(GameEngine.StageName(c, c.GroupGames + k), k == current,
+                    Enumerable.Range(0, ties).Select(_ => new BracketTieView("A definir", "A definir", null, null, null, false, false)).ToList()));
+            }
+            return new CupView(c.Kind, c.Name, LegendStatus(s, c), c.Out, c.Champion, c.GroupName, group, rounds);
+        }).ToList();
+
+    /// <summary>Tabela ao vivo da liga, com zonas de acesso e rebaixamento.</summary>
+    private static LiveTableView? LiveTable(Career s, GameEngine engine)
+    {
+        if (s.LeagueTable.Count == 0) return null;
+        var sorted = GameEngine.Sorted(s.LeagueTable);
+        var size = sorted.Count;
+        var k = WorldSim.Swaps(size);
+        var d = s.Base ? -1 : s.Division;
+        var mine = s.Base ? s.BaseClubId ?? s.ClubId : s.ClubId;
+        var rows = sorted.Select((r, i) => new TableRow
+        {
+            Position = i + 1, Club = r.Club, Mine = r.ClubId == mine,
+            Zone = d < 0 ? null : d > 0 && i < k ? "up" : d < 2 && i >= size - k ? "down" : null,
+            Played = r.Played, Won = r.Won, Drawn = r.Drawn, Lost = r.Lost,
+            GoalsFor = r.GoalsFor, GoalsAgainst = r.GoalsAgainst, Points = r.Points
+        }).ToList();
+        var rounds = s.Competitions.FirstOrDefault(c => c.Kind == "league")?.Days.Count ?? 0;
+        var recent = s.SeasonMatches.TakeLast(5).Reverse().Select(x => new MatchSummary(
+            x.Kind, x.Competition, x.Opponent, x.Home, x.For, x.Against, x.Goals, x.Assists, x.Rating,
+            x.For > x.Against ? "V" : x.For < x.Against ? "D" : "E")).ToList();
+        return new LiveTableView(s.Base ? "Campeonato de Base" : s.LeagueName ?? "Liga", Math.Min(s.LeagueRound, rounds), rounds,
+            engine.LeaguePosition(), rows, recent);
     }
 
     private static List<AttributeView> AttributeViews(Career s)
@@ -219,7 +295,7 @@ public static class ViewBuilder
         return new CalendarView(a, b,
             (a > 0 ? $"{SeasonCalendar.Label(SeasonCalendar.At(cal, a))} concluído. " : "Início da temporada. ") + $"{games} jogos: {list}.",
             cells, strip, 1, strip.Count - 3, agenda, legend,
-            SeasonCalendar.Label(next), GameEngine.SeasonDays,
+            SeasonCalendar.Label(next), GameEngine.SeasonDays, LiveTable(s, engine), Cups(s),
             $"Temporada de {SeasonCalendar.MonthNames[first.Month - 1]} a {SeasonCalendar.MonthNames[last.Month - 1]}");
     }
 
@@ -227,7 +303,14 @@ public static class ViewBuilder
     private static string LegendStatus(Career s, Competition c)
     {
         if (c.Champion) return "Campeão";
-        if (c.Out) return "Eliminado" + (c.Result == "Fase de grupos" ? " na fase de grupos" : c.Result == "Final" ? " na final" : " nas " + c.Result!.ToLowerInvariant().Replace("semifinal", "semifinais"));
+        if (c.Out) return "Eliminado " + c.Result switch
+        {
+            "Oitavas" => "nas oitavas",
+            "Quartas" => "nas quartas",
+            "Semifinal" => "na semifinal",
+            "Final" => "na final",
+            var r => "na " + (r ?? "fase de grupos").ToLowerInvariant()
+        };
         if (c.Kind == "league")
         {
             var played = c.Days.Count(d => d <= s.SeasonDay);

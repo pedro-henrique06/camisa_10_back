@@ -164,11 +164,12 @@ public sealed partial class GameEngine
 
         if (s.SeasonDay >= SeasonDays)
         {
+            if (NationalCupLive() is { } live) { PlayNationalGame(live); return; }
             if (!s.NationalCupDone && !s.Base && s.Season % 2 == 0 && s.Age >= 19 && (s.Has("sel") || s.Overall >= 72))
             {
                 s.NationalCupDone = true;
                 s.SetFlag("sel");
-                StartCup(NationalCupName(), NationalStrength(), true);
+                PlayNationalGame(StartNationalCup());
                 return;
             }
             if (!s.BallonCheckDone && !s.Base && s.Age >= 21 && s.Tier >= 3 && s.Overall >= 85 && s.Fame >= 60 && s.Titles >= 1)
@@ -233,8 +234,11 @@ public sealed partial class GameEngine
 
         s.Queue = queue.Where(e => e != null).Select(e => e!).ToList();
 
-        // Dia de jogo da liga, nas datas do calendário.
-        if (CompetitionOf("league") is { } leagueComp && leagueComp.Days.Contains(s.SeasonDay) && s.Injury <= 0)
+        // Dia de jogo da liga, nas datas do calendário: a rodada inteira é jogada (a do jogador ao vivo).
+        var leagueRound = LeagueRoundOfToday();
+        var fixture = leagueRound >= 0 ? LeagueFixtureToday(leagueRound) : null;
+        if (leagueRound >= 0 && (s.Injury > 0 || fixture == null)) PlayLeagueRound(leagueRound, null);
+        if (leagueRound >= 0 && fixture != null && s.Injury <= 0 && CompetitionOf("league") is { } leagueComp)
         {
             var matchDay = new List<EventDef> { Events.Jogo };
             matchDay.AddRange(Events.MatchDay);
@@ -242,7 +246,8 @@ public sealed partial class GameEngine
             pre.Focus = "pre";
             var plays = new List<GameEvent> { pre };
             plays.AddRange(Moments());
-            StartMatch("league", leagueComp.Name, plays);
+            StartMatch("league", leagueComp.Name, plays, fixture: fixture);
+            s.Match!.Round = leagueRound;
             s.Queue.AddRange(plays);
         }
         // Estadual, copa nacional e continental nos dias marcados.
@@ -311,6 +316,7 @@ public sealed partial class GameEngine
         _ctx = cur.Title + " " + o.Label + " " + text;
         _cupTarget = cur.CompetitionId;
         var live = MatchLive(cur);
+        _cupLive = live;
         var before = Snapshot();
         var applied = Apply(d);
         _ctx = "";
@@ -450,13 +456,19 @@ public sealed partial class GameEngine
         if (d.Ballon is > 0 && !s.Base && s.Age >= 20)
         {
             s.Ballons++;
+            AddTrophy("Bola de Ouro", "award", CleanClub(s.Club));
             s.Headlines.Add(s.Name + " é eleito o melhor do mundo");
         }
         if (CompetitionOf(_cupTarget) is { } comp)
         {
-            if (d.CupWin is > 0) CupOutcome(comp, 1);
-            else if (d.CupDraw is > 0) CupOutcome(comp, 0);
-            else if (d.CupLose is > 0) CupOutcome(comp, -1);
+            // jogo de copa sem campo (salvo antes do jogo ao vivo): o placar sai da decisão.
+            // Com o jogo ao vivo, o resultado vale no apito final (FinishMatch).
+            if (!_cupLive)
+            {
+                if (d.CupWin is > 0) CupResult(comp, 1, 0);
+                else if (d.CupDraw is > 0) CupResult(comp, 1, 1);
+                else if (d.CupLose is > 0) CupResult(comp, 0, 1);
+            }
         }
         else
         {
@@ -664,6 +676,8 @@ public sealed partial class GameEngine
         s.SeasonStartOverall = s.Overall;
         // acesso e rebaixamento da temporada anterior mudam a divisão (e o nível) do clube
         RefreshClub();
+        s.SeasonMatches = new List<MatchRecord>();
+        s.Match = null;
         BuildCompetitions();
         s.CupDone = false;
         s.NationalCupDone = false;
@@ -674,22 +688,15 @@ public sealed partial class GameEngine
     /// <summary>Balanço da temporada (endSeason).</summary>
     private void EndSeason()
     {
-        var (rg, ra) = GameData.Production.GetValueOrDefault(s.Position, (.2, .4));
-        var perf = s.Overall + (s.Morale - 50) / 4.0 + (s.Trust - 50) / 5.0 + (s.Fitness - 70) / 5.0 + R(-8, 8);
-        var jg = (int)(Clamp(Round(s.Trust * .4 + 12 + R(0, 6)), 8, 38) * (s.Fitness < 40 ? .6 : 1));
-        var factor = Math.Max(.2, (perf - 30) / 50);
-        var gl = Round(jg * rg * factor * .6) + s.SeasonGoals;
-        var asst = Round(jg * ra * factor * .6) + s.SeasonAssists;
-        var team = 10 + s.Tier * 14 + R(0, 40);
-        var title = team + perf / 4 >= 105 || s.TitleBonus > 0;
-        // No profissional, a posição na liga vem da tabela do mundo; campeão é quem termina em 1º.
-        (int Rank, int Size, string? Movement, List<TableRow> Table)? league = null;
-        if (!s.Base && s.ClubId != null && Layout().Of(s.ClubId) != null)
-        {
-            league = FinishLeague(perf, s.TitleBonus > 0);
-            title = league.Value.Rank == 1;
-        }
-        var nota = Round1(Clamp(4 + perf / 14, 4.5, 9.8));
+        // Jogos, gols, assistências e nota vêm dos jogos que o jogador disputou na temporada.
+        var matches = s.SeasonMatches.ToList();
+        var jg = matches.Count;
+        var gl = matches.Sum(x => x.Goals);
+        var asst = matches.Sum(x => x.Assists);
+        var nota = jg > 0 ? Round1(matches.Average(x => x.Rating)) : 6.0;
+        // A posição na liga é a da tabela ao vivo; campeão é quem termina em 1º.
+        var league = FinishLeague();
+        var title = league?.Rank == 1;
 
         var mgv = s.SeasonGoals;
         var mav = s.SeasonAssists;
@@ -709,7 +716,11 @@ public sealed partial class GameEngine
         s.Goals += gl;
         s.Assists += asst;
         s.Games += jg;
-        if (title) s.Titles++;
+        if (title)
+        {
+            s.Titles++;
+            AddTrophy(s.Base ? "Campeonato de Base" : s.LeagueName ?? "Campeonato nacional", "league", CleanClub(s.Club));
+        }
 
         var gross = s.Salary * 12 / 1000 + (s.Base ? 0 : gl * (double)s.GoalBonus / 1000);
         var com = s.Has("emp") ? Round(gross * 10) / 100.0 : 0;
@@ -748,10 +759,15 @@ public sealed partial class GameEngine
             LeagueSize = league?.Size ?? 0,
             Movement = league?.Movement,
             Table = league?.Table ?? new List<TableRow>(),
-            Cups = CupResults()
+            Cups = CupResults(),
+            Matches = matches
         };
         s.Phase = GamePhase.SeasonSummary;
     }
+
+    /// <summary>Guarda o título na sala de troféus.</summary>
+    private void AddTrophy(string name, string kind, string team) =>
+        s.Trophies.Add(new Trophy { Name = name, Kind = kind, Season = s.Season, Age = s.Age, Team = team });
 
     /// <summary>Manchete da temporada (mch).</summary>
     private string Headline(double n, bool title, int g)
@@ -1049,6 +1065,7 @@ public sealed partial class GameEngine
             cp.On = false;
             s.Titles++;
             if (cp.National) s.NationalTitles++;
+            AddTrophy(cp.Name, cp.National ? "national" : "cup", cp.National ? s.Nation : CleanClub(s.Club));
             s.Headlines.Add(s.Name + " conquista a " + cp.Name);
             Show(new GameEvent
             {

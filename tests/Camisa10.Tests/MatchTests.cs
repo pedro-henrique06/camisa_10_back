@@ -27,8 +27,9 @@ public class MatchTests(ITestOutputHelper output)
                 }
                 if (s.Phase == GamePhase.Result && view.Result!.Match is { Final: true } mv && s.Match is { } m && !finals.Contains(m))
                 {
-                    Assert.Equal("whistle", mv.Lines[^1].Type);
-                    Assert.StartsWith("Fim de jogo", mv.Lines[^1].Text);
+                    Assert.Contains(mv.Lines, l => l.Type == "whistle" && l.Text.StartsWith("Fim de jogo"));
+                    // na liga, depois do apito, a narração diz onde o time ficou na tabela
+                    if (m.Kind == "league") Assert.Contains("na tabela", mv.Lines[^1].Text);
                     finals.Add(m);
                     if (sample == null && m.Feed.Count > 6) sample = string.Join("\n", m.Feed.Select(l => $"{l.Minute}' [{l.Type}] {l.Text} ({l.For}-{l.Against})"));
                 }

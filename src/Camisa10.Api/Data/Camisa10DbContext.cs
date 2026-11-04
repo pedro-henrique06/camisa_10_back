@@ -31,6 +31,11 @@ public class Camisa10DbContext(DbContextOptions<Camisa10DbContext> options) : Db
         modelBuilder.Owned<CompetitionResult>();
         modelBuilder.Owned<MatchState>();
         modelBuilder.Owned<MatchLine>();
+        modelBuilder.Owned<LeagueRow>();
+        modelBuilder.Owned<MatchRecord>();
+        modelBuilder.Owned<BracketRound>();
+        modelBuilder.Owned<BracketTie>();
+        modelBuilder.Owned<Trophy>();
         modelBuilder.Owned<Chip>();
         modelBuilder.Owned<SeasonReport>();
         modelBuilder.Owned<GameEvent>();
