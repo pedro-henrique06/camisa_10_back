@@ -30,11 +30,14 @@ public record GameView(
 public record DuelPhaseView(string? DuelId, string OpponentName, string OpponentClub, bool Home, string Competition);
 
 /// <summary>Situação da mesa vista da carreira.</summary>
+/// <param name="Mode">"livre", "junto" ou "turno" (avançar junto com o botão Pronto).</param>
+/// <param name="Ready">No modo turno: o jogador já apertou Pronto nesta data.</param>
 public record MesaStatusView(string Id, string Name, string Code, bool Sync, IReadOnlyList<string> WaitingFor,
-    IReadOnlyList<MesaFriendView> Friends);
+    IReadOnlyList<MesaFriendView> Friends, string Mode = "junto", bool Ready = false);
 
 /// <summary>Um amigo da mesa: clube, onde está no calendário e na tabela.</summary>
-public record MesaFriendView(string Name, string? Club, string? Date, int Season, int SeasonDay, int Position, int Overall, string Phase, bool Me);
+public record MesaFriendView(string Name, string? Club, string? Date, int Season, int SeasonDay, int Position, int Overall, string Phase, bool Me,
+    bool Ready = false);
 
 public record Badge(string Primary, string Secondary, string Initials);
 

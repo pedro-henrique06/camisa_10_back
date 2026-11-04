@@ -15,6 +15,13 @@ public class Mesa
     public int WorldSeed { get; set; }
     /// <summary>Calendário junto: ninguém passa da data em que um amigo ainda está.</summary>
     public bool Sync { get; set; } = true;
+    /// <summary>
+    /// Com o calendário junto: "junto" (ninguém passa da data de um amigo) ou "turno" (avançar junto:
+    /// cada um aperta Pronto e a data passa para todos de uma vez quando o último fica pronto).
+    /// </summary>
+    public string Mode { get; set; } = "junto";
+    /// <summary>Quem já apertou Pronto no modo turno ("idDaCarreira@posição no calendário").</summary>
+    public List<string> ReadyCareers { get; set; } = new();
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
     public List<MesaMember> Members { get; set; } = new();
