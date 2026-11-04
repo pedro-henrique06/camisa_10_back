@@ -130,6 +130,19 @@ por acesso ou rebaixamento recente; para corrigir, edite a lista e regere:
   zagueiro, ponta x lateral, meia x volante) ficam em **combate direto**. Fora disso, quem defende tem a ajuda
   do time (+2). Amistosos a qualquer hora. Se o amigo sumir, depois de 90 s dá para escolher ou rolar por ele.
   Diário da mesa com entradas, duelos, títulos e transferências.
+- **Casa do jogador e evolução por idade** (`Equipment.cs`, `GameEngine.Home.cs`): jovem evolui rápido. Com a idade, a
+  chance de evoluir no treino cai (30% até 21 anos, 5% depois dos 30) e o corpo começa a cair. Com o dinheiro da
+  carreira, o jogador compra equipamentos para casa (ação `Buy`):
+  - **por atributo** (halteres e estação de musculação para o físico, esteira e bicicleta para o ritmo, lançadora
+    de bolas, campo society, kit de agilidade, sala de vídeo): mais chance de evoluir aquele atributo e menos queda
+    com a idade, com efeito maior depois dos 30;
+  - **recuperação** (banheira de gelo, câmara hiperbárica): menos desgaste e menos lesões, e físico mais alto;
+  - **profissionais** (fisioterapeuta, chef e nutricionista): custam por temporada e, sem dinheiro, vão embora.
+    A câmara hiperbárica e o chef dão um ano a mais de carreira cada (aposentadoria até os 40).
+- **Lesões**: 7 lesões graves comuns (ligamento, fratura por estresse, tendão, tendão de Aquiles, menisco, ombro,
+  fratura na perna), 8 leves, e três que podem encerrar a carreira conforme a escolha: hérnia de disco (cirurgia
+  arriscada, conviver com a dor ou parar), concussão (a terceira faz os médicos recomendarem parar) e arritmia
+  no coração (operar, parar ou esconder e continuar).
 - **Decisões de carreira e lances por posição** (`Events.Decisions.cs`): 15 decisões de carreira (banco de
   reservas, improvisação, técnico novo, concorrente contratado, renovação, coletiva polêmica, conversa vazada,
   cobrador de faltas, empréstimo, liderança, protesto da torcida, seleção com dor...). As que dependem do

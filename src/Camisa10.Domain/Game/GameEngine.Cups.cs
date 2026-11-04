@@ -192,6 +192,8 @@ public sealed partial class GameEngine
     {
         foreach (var (a, b) in GroupRounds[r])
         {
+            // grupo incompleto (país com poucos clubes): o jogo contra a vaga vazia não acontece
+            if (a >= c.Group.Count || b >= c.Group.Count) continue;
             var (ia, ib) = (c.Group[a].ClubId, c.Group[b].ClubId);
             int ga, gb;
             if (mine is { } m && (a == 0 || b == 0)) (ga, gb) = a == 0 ? (m.For, m.Against) : (m.Against, m.For);

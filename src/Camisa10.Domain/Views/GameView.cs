@@ -84,7 +84,20 @@ public record HudView(
     int LeaguePosition,
     int LeagueSize,
     /// <summary>Sala de troféus: títulos agrupados por competição.</summary>
-    TrophyRoomView Trophies);
+    TrophyRoomView Trophies,
+    /// <summary>Casa do jogador: equipamentos e profissionais para comprar.</summary>
+    HomeView? Home = null);
+
+/// <summary>Casa do jogador: o que dá para comprar e o que ele já tem.</summary>
+/// <param name="Upkeep">Custo por temporada dos profissionais contratados (R$ mi).</param>
+/// <param name="Note">Explicação de como a idade pesa na evolução.</param>
+public record HomeView(double Money, double Upkeep, string Note, IReadOnlyList<HomeItemView> Items);
+
+/// <param name="Price">R$ milhões (por temporada nos profissionais).</param>
+/// <param name="Effect">Ex.: "Físico: +14% de chance de evoluir no treino".</param>
+/// <param name="Locked">Precisa de outro item antes (ex.: a estação precisa dos halteres).</param>
+public record HomeItemView(string Id, string Name, string Icon, string Description, double Price, bool PerSeason, bool Owned,
+    bool Affordable, string Effect, string? Locked);
 
 /// <summary>Títulos da carreira. Untracked = títulos de antes da sala de troféus (carreiras antigas).</summary>
 public record TrophyRoomView(int Titles, int NationalTitles, int Ballons, int Untracked, IReadOnlyList<TrophyGroupView> Groups);

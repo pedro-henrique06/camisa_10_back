@@ -126,6 +126,10 @@ public sealed partial class GameEngine
                 if (s.MarketMode == "bt") Back(); else Stay();
                 return;
 
+            case ActionType.Buy:
+                Buy(action.ClubId ?? throw new GameRuleException("Escolha o equipamento."));
+                return;
+
             case ActionType.Offer:
                 Pitch(action.ClubId ?? throw new GameRuleException("Escolha o clube."), action.Index ?? 1);
                 return;
@@ -420,9 +424,9 @@ public sealed partial class GameEngine
             var o0 = s.Overall;
             if (h > 0)
             {
-                if (Rand() < (s.Age <= 21 ? .3 : s.Age <= 27 ? .2 : .1) && Ovr() < s.Potential)
+                var k = AttributeFromText(_ctx) ?? WeightedAttribute();
+                if (Rand() < (s.Age <= 21 ? .3 : s.Age <= 27 ? .2 : s.Age <= 30 ? .1 : .06) + Equipment.TrainBonus(s, k) && Ovr() < s.Potential)
                 {
-                    var k = AttributeFromText(_ctx) ?? WeightedAttribute();
                     s.Attributes[k] = Ca(s.Attributes[k] + 2);
                     res.GrownAttribute = k; res.GrownValue = 2;
                 }
@@ -439,8 +443,12 @@ public sealed partial class GameEngine
         if (d.Train is { } tg)
         {
             var o1 = s.Overall;
-            var pts = Rand() < (s.Age <= 21 ? .3 : .15) + (tg == Routine().Focus ? .2 : 0) ? 2 : 1;
-            if (s.Attributes[tg] >= 88 || s.Age >= 31) pts = Rand() < .5 ? pts : 0;
+            // jovem evolui rápido; com a idade fica bem mais difícil, e os equipamentos da casa ajudam
+            var pts = Rand() < (s.Age <= 21 ? .3 : s.Age <= 25 ? .18 : s.Age <= 29 ? .1 : .05) + (tg == Routine().Focus ? .2 : 0) + Equipment.TrainBonus(s, tg) ? 2 : 1;
+            var keep = s.Age <= 27 ? 1 : s.Age <= 30 ? .7 : s.Age <= 33 ? .45 : .3;
+            keep = Math.Min(1, keep + Equipment.ForAttribute(s, tg) * (s.Age >= 30 ? .2 : .1));
+            if (s.Attributes[tg] >= 88) keep *= .5;
+            if (Rand() >= keep) pts = 0;
             if (Ovr() >= s.Potential && Rand() < .7) pts = 0;
             if (pts > 0)
             {
@@ -654,9 +662,12 @@ public sealed partial class GameEngine
         }
         else
         {
+            // os equipamentos do atributo e a recuperação seguram a queda da idade
             for (var i = 0; i < -n * 4; i++)
             {
                 var k = Rand() < .65 ? (Rand() < .5 ? "rit" : "fis") : WeightedAttribute();
+                var hold = Math.Min(.75, Equipment.ForAttribute(s, k) * .3 + Equipment.Recovery(s) * .08);
+                if (Rand() < hold) continue;
                 s.Attributes[k] = Ca(s.Attributes[k] - 1);
             }
         }
@@ -760,6 +771,17 @@ public sealed partial class GameEngine
         var net = Round2(gross * .73 - com);
         var spent = Round2(net * (s.Has("fin") ? .25 : .4));
         s.Money = Math.Max(0, Round1(s.Money + net - spent));
+        // profissionais da casa: o salário deles sai no fim da temporada (sem dinheiro, eles vão embora)
+        var upkeep = Equipment.Upkeep(s);
+        if (upkeep > 0)
+        {
+            if (s.Money >= upkeep) s.Money = Round1(s.Money - upkeep);
+            else
+            {
+                s.Equipment.RemoveAll(id => Equipment.Find(id)?.PerSeason == true);
+                s.Headlines.Add($"Sem dinheiro, {s.Name} dispensa o fisioterapeuta e o chef");
+            }
+        }
         s.Fans = Clamp(Round(s.Fans + (nota >= 7.5 ? 5 : nota < 6 ? -6 : 0) + (title ? 8 : 0) - (s.Fans - 50) / 4.0));
         s.Locker = Clamp(Round(s.Locker + (s.Trust - 50) / 10.0 - (s.Locker - 50) / 4.0));
         if (s.Fans < 30) s.Morale = Clamp(s.Morale - 5);
@@ -822,7 +844,7 @@ public sealed partial class GameEngine
     private void AgeUp()
     {
         s.Age++;
-        s.Wear = Math.Max(0, Round1(s.Wear + (s.Fitness < 45 ? .5 : s.Fitness >= 75 ? -.5 : 0)));
+        s.Wear = Math.Max(0, Round1(s.Wear + (s.Fitness < 45 ? .5 : s.Fitness >= 75 ? -.5 : 0) - Equipment.Recovery(s) * .25));
         if (!s.Base)
         {
             s.Contract--;
@@ -830,10 +852,12 @@ public sealed partial class GameEngine
                 s.Scheduled.Add(new ScheduledEvent { EventId = "con", At = s.Day + 3 });
         }
         Grow(s.Age <= 21 ? R(2, 5) : s.Age <= 25 ? R(1, 3) : s.Age <= 29 ? R(0, 1) : s.Age <= 32 ? -R(0, 2) : -R(1, 3));
-        s.Fitness = Clamp(s.Fitness + 12 - (s.Age > 30 ? (s.Age - 30) * 2 : 0), 0, s.Age > 28 ? 100 - (s.Age - 28) * 3 : 100);
+        s.Fitness = Clamp(s.Fitness + 12 - (s.Age > 30 ? (s.Age - 30) * 2 : 0), 0,
+            s.Age > 28 ? Math.Min(100, 100 - (s.Age - 28) * 3 + (int)Math.Round(Equipment.Recovery(s) * 3)) : 100);
         s.Morale = Round(s.Morale + (55 - s.Morale) / 4.0);
 
-        if (s.Age >= 38 || s.Overall < 30) { Finish(); return; }
+        // a câmara hiperbárica e o chef dão mais um ou dois anos de carreira
+        if (s.Age >= 38 + Equipment.Longevity(s) || s.Overall < 30) { Finish(); return; }
         if (s.Base && s.Age >= 18) { Promote(); s.Phase = GamePhase.Promotion; return; }
         if (s.Age >= 34 && s.Age % 2 == 0) { s.Phase = GamePhase.Decision; return; }
         StartSeason();
@@ -1213,7 +1237,9 @@ public enum ActionType
     /// <summary>Pendurar as chuteiras na tela de decisão.</summary>
     Retire,
     /// <summary>No mercado: oferecer-se ao clube <see cref="GameAction.ClubId"/>, pedindo o salário <see cref="GameAction.Index"/> (0 menos, 1 normal, 2 mais).</summary>
-    Offer
+    Offer,
+    /// <summary>Comprar o equipamento (ou contratar o profissional) de id <see cref="GameAction.ClubId"/> para a casa.</summary>
+    Buy
 }
 
 /// <param name="Power">Força da barra no pênalti (0 a 100).</param>
