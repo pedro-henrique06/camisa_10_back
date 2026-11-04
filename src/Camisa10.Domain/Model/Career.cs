@@ -347,7 +347,7 @@ public class MatchLine
 {
     public int Minute { get; set; }
     public string Text { get; set; } = "";
-    /// <summary>info, chance-for, chance-against, goal-for, goal-against, whistle, decision.</summary>
+    /// <summary>info, attack-for, attack-against (quem está com a bola), chance-for, chance-against, goal-for, goal-against, whistle, decision.</summary>
     public string Type { get; set; } = "info";
     public int For { get; set; }
     public int Against { get; set; }
