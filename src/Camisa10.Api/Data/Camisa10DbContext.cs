@@ -13,6 +13,8 @@ public class Camisa10DbContext(DbContextOptions<Camisa10DbContext> options) : Db
     public DbSet<Career> Careers => Set<Career>();
     public DbSet<Mesa> Mesas => Set<Mesa>();
     public DbSet<Duel> Duels => Set<Duel>();
+    public DbSet<Account> Accounts => Set<Account>();
+    public DbSet<AuthSession> Sessions => Set<AuthSession>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -76,6 +78,21 @@ public class Camisa10DbContext(DbContextOptions<Camisa10DbContext> options) : Db
             e.HasKey(d => d.Id);
             e.Property(d => d.Version).IsConcurrencyToken();
             e.HasIndex(d => d.MesaId);
+        });
+
+        modelBuilder.Entity<Account>(e =>
+        {
+            e.ToCollection("accounts");
+            e.HasKey(a => a.Id);
+            e.HasIndex(a => a.Email).IsUnique();
+            e.HasIndex(a => a.PlayerId);
+        });
+
+        modelBuilder.Entity<AuthSession>(e =>
+        {
+            e.ToCollection("sessions");
+            e.HasKey(s => s.Id);
+            e.HasIndex(s => s.AccountId);
         });
     }
 }

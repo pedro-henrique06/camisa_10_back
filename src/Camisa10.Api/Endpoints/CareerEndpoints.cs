@@ -42,16 +42,38 @@ public static partial class CareerEndpoints
         careers.MapDelete("/{id}", DeleteCareer).WithSummary("Apaga uma carreira.");
     }
 
+    private const string PlayerItem = "c10.player";
+
+    public static bool ValidPlayerId(string id) => PlayerIdRx().IsMatch(id);
+
+    /// <summary>
+    /// Descobre o jogador: pela sessão da conta (Authorization: Bearer) ou, para convidados, pelo id do
+    /// aparelho (X-Player-Id). Um id que já é de uma conta só vale com a sessão dela.
+    /// </summary>
     internal static async ValueTask<object?> RequirePlayer(EndpointFilterInvocationContext ctx, EndpointFilterDelegate next)
     {
-        var id = ctx.HttpContext.Request.Headers[PlayerHeader].ToString();
-        if (!PlayerIdRx().IsMatch(id))
+        var http = ctx.HttpContext;
+        var db = http.RequestServices.GetRequiredService<Camisa10DbContext>();
+        if (AuthEndpoints.BearerToken(http) is { } token)
+        {
+            var session = await AuthEndpoints.Session(db, token, http.RequestAborted);
+            if (session == null)
+                return TypedResults.Problem("Sua sessão expirou. Entre de novo na sua conta.", statusCode: StatusCodes.Status401Unauthorized);
+            http.Items[PlayerItem] = session.PlayerId;
+            return await next(ctx);
+        }
+        var id = http.Request.Headers[PlayerHeader].ToString();
+        if (!ValidPlayerId(id))
             return TypedResults.Problem($"Envie o cabeçalho {PlayerHeader} com 8 a 64 caracteres (letras, números, - ou _).",
                 statusCode: StatusCodes.Status400BadRequest);
+        if (await db.Accounts.AsNoTracking().AnyAsync(a => a.PlayerId == id, http.RequestAborted))
+            return TypedResults.Problem("Estas carreiras são de uma conta. Entre com o seu e-mail e senha.", statusCode: StatusCodes.Status401Unauthorized);
+        http.Items[PlayerItem] = id;
         return await next(ctx);
     }
 
-    private static string Player(HttpContext http) => http.Request.Headers[PlayerHeader].ToString();
+    /// <summary>Jogador da requisição (definido pelo <see cref="RequirePlayer"/>).</summary>
+    internal static string Player(HttpContext http) => (string)http.Items[PlayerItem]!;
 
     private static async Task<Ok<List<CareerSummary>>> ListCareers(HttpContext http, Camisa10DbContext db, string? status, CancellationToken ct)
     {

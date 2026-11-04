@@ -11,6 +11,10 @@ public static class MesaService
 {
     private const string CodeChars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
+    /// <summary>Id público do amigo na mesa (não revela o id de jogador, que identifica o convidado).</summary>
+    public static string MemberId(string mesaId, string playerId) =>
+        Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(mesaId + "|" + playerId)))[..16].ToLowerInvariant();
+
     public static string NewCode()
     {
         var r = Random.Shared;

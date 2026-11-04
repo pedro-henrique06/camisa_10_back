@@ -1,4 +1,6 @@
 using System.Text.Json.Serialization;
+using System.Threading.RateLimiting;
+using Microsoft.AspNetCore.HttpOverrides;
 using Camisa10.Api.Data;
 using Camisa10.Api.Endpoints;
 using Microsoft.EntityFrameworkCore;
@@ -19,12 +21,29 @@ builder.Services.AddHostedService<DatabaseInitializer>();
 builder.Services.ConfigureHttpJsonOptions(o => o.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 builder.Services.AddProblemDetails();
 builder.Services.AddOpenApi();
+// Atrás do proxy do Railway: o IP de quem chamou vem no X-Forwarded-For (o último endereço, que o proxy põe).
+builder.Services.Configure<ForwardedHeadersOptions>(o =>
+{
+    o.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    o.KnownIPNetworks.Clear();
+    o.KnownProxies.Clear();
+});
+// Entrar e criar conta: no máximo 10 tentativas por minuto por endereço (contra quem tenta adivinhar senhas).
+builder.Services.AddRateLimiter(o =>
+{
+    o.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    o.AddPolicy(AuthEndpoints.RateLimitPolicy, http => RateLimitPartition.GetFixedWindowLimiter(
+        http.Connection.RemoteIpAddress?.ToString() ?? "local",
+        _ => new FixedWindowRateLimiterOptions { PermitLimit = 10, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
+});
 builder.Services.AddCors(o => o.AddDefaultPolicy(p => p.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod()));
 
 var app = builder.Build();
 
+app.UseForwardedHeaders();
 app.UseExceptionHandler();
 app.UseCors();
+app.UseRateLimiter();
 app.MapOpenApi();
 
 app.MapGet("/", () => Results.Redirect("/openapi/v1.json"));
@@ -36,6 +55,7 @@ app.MapGet("/health", (DatabaseStatus db) => Results.Ok(new
     mongoServidor = db.Server,
     mongoErro = db.Connected ? null : db.LastError
 }));
+app.MapAuthEndpoints();
 app.MapCareerEndpoints();
 app.MapMesaEndpoints();
 

@@ -252,8 +252,8 @@ public class MesaIntegrationTests : IDisposable
         Assert.Contains(mesa.GetProperty("duels").EnumerateArray(), d => d.GetProperty("kind").GetString() == "league" && d.GetProperty("finished").GetBoolean());
 
         // amistoso a qualquer hora
-        var betoId = mesa.GetProperty("members").EnumerateArray().First(m => m.GetProperty("name").GetString() == "Beto").GetProperty("playerId").GetString();
-        var friendly = await ana.PostAsJsonAsync($"/api/mesas/{mesaId}/duels", new { opponentPlayerId = betoId });
+        var betoId = mesa.GetProperty("members").EnumerateArray().First(m => m.GetProperty("name").GetString() == "Beto").GetProperty("memberId").GetString();
+        var friendly = await ana.PostAsJsonAsync($"/api/mesas/{mesaId}/duels", new { opponentMemberId = betoId });
         Assert.Equal(HttpStatusCode.Created, friendly.StatusCode);
         var fid = (await Json_(friendly)).GetProperty("id").GetString()!;
         Assert.True(await PlayDuel(ana, beto, fid));
