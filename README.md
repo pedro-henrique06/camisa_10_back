@@ -123,9 +123,19 @@ por acesso ou rebaixamento recente; para corrigir, edite a lista e regere:
   compartilhados pela mesa (tabelas iguais, mesmo acesso e rebaixamento). Com o calendário junto, ninguém
   passa de uma data enquanto um amigo não chegou nela. Quando os clubes de dois amigos se enfrentam na liga
   (amigos na mesma liga se enfrentam no meio da temporada), o jogo vira **duelo**: 6 lances alternando quem
-  ataca; o atacante escolhe chute, drible ou passe, o defensor tenta adivinhar (+4 se acertar, +2 para o
-  atacante se errar) e os dois rolam d20 + (atributo − 50) ÷ 5. Amistosos a qualquer hora; se o amigo sumir,
-  depois de 90 s dá para decidir por ele. Diário da mesa com entradas, duelos, títulos e transferências.
+  ataca. O atacante escolhe a jogada e o defensor tenta adivinhar (+4 se acertar, +2 para o atacante se errar).
+  As jogadas são as da posição de cada um (o ponta cruza ou corta para dentro, o zagueiro antecipa ou chega
+  no bote), sempre de três tipos: chute, drible ou passe. Depois das escolhas, **cada um rola o próprio d20**
+  (`POST /api/duels/{id}/roll`): d20 + (atributo − 50) ÷ 5. Posições que se enfrentam em campo (atacante x
+  zagueiro, ponta x lateral, meia x volante) ficam em **combate direto**. Fora disso, quem defende tem a ajuda
+  do time (+2). Amistosos a qualquer hora. Se o amigo sumir, depois de 90 s dá para escolher ou rolar por ele.
+  Diário da mesa com entradas, duelos, títulos e transferências.
+- **Decisões de carreira e lances por posição** (`Events.Decisions.cs`): 15 decisões de carreira (banco de
+  reservas, improvisação, técnico novo, concorrente contratado, renovação, coletiva polêmica, conversa vazada,
+  cobrador de faltas, empréstimo, liderança, protesto da torcida, seleção com dor...). As que dependem do
+  jogador vão para o d20 com o atributo certo. No jogo, cada posição tem lances próprios no d20: mano a mano
+  e cabeceio do atacante, linha de fundo do ponta, passe decisivo do meia, roubada do volante, duelo com o
+  ponta do lateral, corrida e bola aérea do zagueiro. Saem em 65% dos jogos, às vezes dois no mesmo jogo.
   Gravações de um documento por vez (MongoDB sem réplica não aceita transação com vários documentos).
 - **Estatísticas dos jogos**: jogos, gols, assistências e nota do balanço são a soma das partidas do
   jogador (parte dos gols do time é dele, pela posição; a nota de cada jogo vem dos gols, passes,
