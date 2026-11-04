@@ -113,6 +113,10 @@ por acesso ou rebaixamento recente; para corrigir, edite a lista e regere:
   (método do círculo, turno e returno). O jogo do jogador usa o placar do jogo ao vivo; os outros são
   simulados pela força dos clubes. Posição final, título, acesso e rebaixamento saem dessa tabela, e a
   classificação inteira é gravada para o mundo da temporada seguinte.
+- **Grupos e chaves das copas** (`GameEngine.Cups.cs`): estadual e continental com grupo de 4 (todos contra
+  todos; os 2 primeiros passam) e mata-mata; copa nacional só mata-mata. A chave é inteira: o adversário de
+  cada jogo do jogador sai dela, os outros jogos são simulados pela força dos times, e quem é eliminado vê a
+  chave seguir até o campeão. Os torneios da seleção usam o mesmo formato (grupo e oitavas a final).
 - **Estatísticas dos jogos**: jogos, gols, assistências e nota do balanço são a soma das partidas do
   jogador (parte dos gols do time é dele, pela posição; a nota de cada jogo vem dos gols, passes,
   decisões e do resultado).

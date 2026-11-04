@@ -49,6 +49,9 @@ public class CupStructureTests
         Assert.Equal("Final", cv.Bracket[^1].Name);
         Assert.Single(cv.Bracket[^1].Ties);
         Assert.True(cv.Bracket[0].Current);
+        // antes da fase de grupos, a chave da Libertadores já mostra as fases (8, 4, 2 e 1 confrontos)
+        var lib = view.Single(c => c.Kind == "continental");
+        Assert.Equal(new[] { 8, 4, 2, 1 }, lib.Bracket.Select(b => b.Ties.Count));
     }
 
     [Fact]

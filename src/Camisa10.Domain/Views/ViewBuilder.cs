@@ -96,7 +96,7 @@ public static class ViewBuilder
             var ties = c.Bracket.Count > 0 ? c.Bracket[^1].Ties.Count : 1 << Math.Max(0, c.KoRounds - 1);
             for (var k = c.Bracket.Count; k < c.KoRounds; k++)
             {
-                ties = Math.Max(1, (ties + 1) / (k == 0 ? 1 : 2));
+                if (k > 0) ties = Math.Max(1, (ties + 1) / 2);
                 rounds.Add(new BracketRoundView(GameEngine.StageName(c, c.GroupGames + k), k == current,
                     Enumerable.Range(0, ties).Select(_ => new BracketTieView("A definir", "A definir", null, null, null, false, false)).ToList()));
             }
