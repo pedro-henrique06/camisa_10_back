@@ -97,7 +97,8 @@ public class LeagueTableTests(ITestOutputHelper output)
         Assert.Equal(20, view.Calendar.Table!.Rows.Count);
         Assert.Contains(view.Calendar.Table.Rows, r => r.Mine && r.Club == "Palmeiras");
         Assert.Equal(20, view.Hud.LeagueSize);
-        Assert.InRange(view.Hud.LeaguePosition, 1, 20);
+        // antes da primeira rodada, sem posição (a tabela só tem zeros)
+        Assert.Equal(0, view.Hud.LeaguePosition);
     }
 
     private static (Career, GameEngine) Pro(string club)

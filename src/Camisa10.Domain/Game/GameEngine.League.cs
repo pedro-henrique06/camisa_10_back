@@ -147,9 +147,9 @@ public sealed partial class GameEngine
         .ThenBy(r => r.Club, StringComparer.Ordinal)
         .ToList();
 
-    /// <summary>Posição atual do clube do jogador (1 em diante); 0 sem tabela.</summary>
+    /// <summary>Posição atual do clube do jogador (1 em diante); 0 sem tabela ou antes da primeira rodada.</summary>
     public int LeaguePosition() =>
-        s.LeagueTable.Count == 0 ? 0 : Sorted(s.LeagueTable).FindIndex(r => r.ClubId == MyLeagueClubId) + 1;
+        s.LeagueTable.Count == 0 || s.LeagueRound == 0 ? 0 : Sorted(s.LeagueTable).FindIndex(r => r.ClubId == MyLeagueClubId) + 1;
 
     /// <summary>Linha da narração depois do apito: onde o time ficou na tabela.</summary>
     private string TableLine()

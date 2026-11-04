@@ -109,6 +109,8 @@ public class Career
     public int LeagueRound { get; set; }
     /// <summary>Jogos do jogador na temporada (placar, gols, assistências e nota).</summary>
     public List<MatchRecord> SeasonMatches { get; set; } = new();
+    /// <summary>Sala de troféus: cada título com a temporada, a idade e o time.</summary>
+    public List<Trophy> Trophies { get; set; } = new();
 
     // ----- Estatísticas -----
     public int SeasonGoals { get; set; }
@@ -379,6 +381,18 @@ public class LeagueRow
     public int GoalsFor { get; set; }
     public int GoalsAgainst { get; set; }
     public int Points { get; set; }
+}
+
+/// <summary>Um título da carreira.</summary>
+public class Trophy
+{
+    public string Name { get; set; } = "";
+    /// <summary>league, state, cup, continental, national ou award (Bola de Ouro).</summary>
+    public string Kind { get; set; } = "";
+    public int Season { get; set; }
+    public int Age { get; set; }
+    /// <summary>Clube (ou seleção) com que o título foi conquistado.</summary>
+    public string Team { get; set; } = "";
 }
 
 /// <summary>Um jogo do jogador na temporada.</summary>

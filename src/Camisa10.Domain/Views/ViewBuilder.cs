@@ -65,7 +65,22 @@ public static class ViewBuilder
             s.Status == CareerStatus.Active && engine.CanSearchClub(),
             Enumerable.Range(1, GameEngine.SeasonDays).Select(n => s.Competitions.FirstOrDefault(c => c.Days.Contains(n))?.Kind).ToList(),
             s.SeasonDay >= 1 ? SeasonCalendar.Label(SeasonCalendar.At(s.CalendarType, s.SeasonDay)) : null,
-            engine.LeaguePosition(), s.LeagueTable.Count);
+            engine.LeaguePosition(), s.LeagueTable.Count, TrophyRoom(s));
+    }
+
+    /// <summary>Ordem das competições na sala de troféus: prêmios, seleção, continental, liga, copa, estadual.</summary>
+    private static readonly string[] TrophyOrder = { "award", "national", "continental", "league", "cup", "state" };
+
+    private static TrophyRoomView TrophyRoom(Career s)
+    {
+        var groups = s.Trophies
+            .GroupBy(x => (x.Name, x.Kind))
+            .Select(g => new TrophyGroupView(g.Key.Name, g.Key.Kind, g.Count(), g.OrderBy(x => x.Season).ToList()))
+            .OrderBy(g => Array.IndexOf(TrophyOrder, g.Kind) is var i && i < 0 ? 99 : i)
+            .ThenByDescending(g => g.Count)
+            .ToList();
+        var tracked = s.Trophies.Count(x => x.Kind != "award");
+        return new TrophyRoomView(s.Titles, s.NationalTitles, s.Ballons, Math.Max(0, s.Titles - tracked), groups);
     }
 
     /// <summary>Jogo em andamento (ainda sem apito final) desta data.</summary>

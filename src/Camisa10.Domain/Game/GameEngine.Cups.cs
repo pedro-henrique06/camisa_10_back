@@ -292,6 +292,7 @@ public sealed partial class GameEngine
             c.Result = "Campeão";
             s.Titles++;
             if (IsNational(c)) s.NationalTitles++;
+            AddTrophy(c.Name, c.Kind, IsNational(c) ? s.Nation : CleanClub(s.Club));
             s.Headlines.Add(s.Name + " é campeão: " + c.Name);
             s.Queue.Insert(0, new GameEvent
             {

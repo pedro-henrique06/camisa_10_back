@@ -456,6 +456,7 @@ public sealed partial class GameEngine
         if (d.Ballon is > 0 && !s.Base && s.Age >= 20)
         {
             s.Ballons++;
+            AddTrophy("Bola de Ouro", "award", CleanClub(s.Club));
             s.Headlines.Add(s.Name + " é eleito o melhor do mundo");
         }
         if (CompetitionOf(_cupTarget) is { } comp)
@@ -715,7 +716,11 @@ public sealed partial class GameEngine
         s.Goals += gl;
         s.Assists += asst;
         s.Games += jg;
-        if (title) s.Titles++;
+        if (title)
+        {
+            s.Titles++;
+            AddTrophy(s.Base ? "Campeonato de Base" : s.LeagueName ?? "Campeonato nacional", "league", CleanClub(s.Club));
+        }
 
         var gross = s.Salary * 12 / 1000 + (s.Base ? 0 : gl * (double)s.GoalBonus / 1000);
         var com = s.Has("emp") ? Round(gross * 10) / 100.0 : 0;
@@ -759,6 +764,10 @@ public sealed partial class GameEngine
         };
         s.Phase = GamePhase.SeasonSummary;
     }
+
+    /// <summary>Guarda o título na sala de troféus.</summary>
+    private void AddTrophy(string name, string kind, string team) =>
+        s.Trophies.Add(new Trophy { Name = name, Kind = kind, Season = s.Season, Age = s.Age, Team = team });
 
     /// <summary>Manchete da temporada (mch).</summary>
     private string Headline(double n, bool title, int g)
@@ -1056,6 +1065,7 @@ public sealed partial class GameEngine
             cp.On = false;
             s.Titles++;
             if (cp.National) s.NationalTitles++;
+            AddTrophy(cp.Name, cp.National ? "national" : "cup", cp.National ? s.Nation : CleanClub(s.Club));
             s.Headlines.Add(s.Name + " conquista a " + cp.Name);
             Show(new GameEvent
             {

@@ -65,7 +65,15 @@ public record HudView(
     string? Date,
     /// <summary>Posição do clube na tabela ao vivo (0 sem tabela) e quantos clubes tem a liga.</summary>
     int LeaguePosition,
-    int LeagueSize);
+    int LeagueSize,
+    /// <summary>Sala de troféus: títulos agrupados por competição.</summary>
+    TrophyRoomView Trophies);
+
+/// <summary>Títulos da carreira. Untracked = títulos de antes da sala de troféus (carreiras antigas).</summary>
+public record TrophyRoomView(int Titles, int NationalTitles, int Ballons, int Untracked, IReadOnlyList<TrophyGroupView> Groups);
+
+/// <summary>Uma competição vencida: quantas vezes, e cada conquista (temporada, idade, time).</summary>
+public record TrophyGroupView(string Name, string Kind, int Count, IReadOnlyList<Trophy> Wins);
 
 /// <summary>Barra da competição. Kind: league, state, cup, continental ou national (cor no app).</summary>
 public record CompetitionView(string Name, string Subtitle, string Kind);
