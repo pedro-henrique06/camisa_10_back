@@ -129,6 +129,9 @@ public static class WorldSim
         var ids = layout.Leagues[iso][division];
         var ordered = ids.OrderByDescending(id => Score(seed, layout.Season, id)).ToList();
         var mine = results.FirstOrDefault(r => r.Season == layout.Season && ids.Contains(r.ClubId));
+        // classificação da tabela ao vivo do jogador: vale para todos os clubes da liga
+        if (mine != null && mine.Order.Count == ids.Count && mine.Order.All(ids.Contains))
+            return mine.Order.ToList();
         if (mine != null)
         {
             ordered.Remove(mine.ClubId);
@@ -156,5 +159,5 @@ public static class WorldSim
     }
 
     private static string ResultsKey(IReadOnlyList<ClubSeasonResult> results, int season) =>
-        string.Join(",", results.Where(r => r.Season < season).Select(r => $"{r.Season}-{r.ClubId}-{r.Rank}"));
+        string.Join(",", results.Where(r => r.Season < season).Select(r => $"{r.Season}-{r.ClubId}-{r.Rank}-{Hash(string.Join(";", r.Order)):x}"));
 }

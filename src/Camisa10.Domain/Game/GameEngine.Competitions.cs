@@ -24,7 +24,9 @@ public sealed partial class GameEngine
     /// </summary>
     private void BuildCompetitions()
     {
-        s.Queue.RemoveAll(e => e.CompetitionId != null);
+        // troca de clube no meio do dia: os lances do jogo do clube antigo saem da fila
+        s.Queue.RemoveAll(e => e.CompetitionId != null || (e.IsMatch && e.Minute != null));
+        if (s.Match is { Final: false }) s.Match = null;
         var country = s.Base ? null : CountryOfId(s.ClubId);
         // O calendário (ano ou europeu) é do clube no começo da temporada; quem troca de clube no meio
         // segue as datas da temporada em andamento.
@@ -57,6 +59,7 @@ public sealed partial class GameEngine
             if (c.GroupGames > 0) c.Points = Math.Min(c.Played, c.GroupGames) * 2;
         }
         s.Competitions = list;
+        EnsureLeagueTable();
     }
 
     private Competition? CompetitionOf(string? kind) =>
