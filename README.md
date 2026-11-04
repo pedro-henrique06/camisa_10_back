@@ -176,7 +176,24 @@ ou `out`) e o canto para onde o goleiro pulou, para o app animar a cobrança.
 
 ## API
 
-Todas as rotas de carreira exigem o cabeçalho `X-Player-Id` (8 a 64 caracteres; o app gera um na primeira vez).
+Todas as rotas de carreira e de mesa precisam saber quem é o jogador:
+
+- **Convidado:** cabeçalho `X-Player-Id` (8 a 64 caracteres; o app gera um na primeira vez).
+- **Com conta:** cabeçalho `Authorization: Bearer <token>`. Um id de convidado que virou conta só vale com o token.
+
+### Conta (`/api/auth`)
+
+| Rota | O que faz |
+|---|---|
+| `POST /register` `{ email, password, name }` | Cria a conta. As carreiras e mesas do convidado (`X-Player-Id`) passam a ser da conta. |
+| `POST /login` `{ email, password }` | Devolve o token. Carreiras de convidado feitas neste aparelho vêm para a conta (`imported`). |
+| `POST /logout` | Encerra a sessão deste aparelho. |
+| `GET /me` | E-mail e nome da conta. |
+
+- A senha é guardada com PBKDF2 (SHA-256, 100 mil iterações e sal aleatório).
+- O banco guarda só o SHA-256 do token. A sessão cai depois de 180 dias sem uso.
+- Criar conta e entrar aceitam até 10 tentativas por minuto por IP.
+- Na mesa, cada amigo aparece com um `memberId` próprio da mesa, e o id de jogador não sai do servidor.
 
 | Método | Rota | Descrição |
 | --- | --- | --- |

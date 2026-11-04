@@ -10,14 +10,16 @@ namespace Camisa10.Api.Endpoints;
 public record NewMesaRequest(string Name, string PlayerName);
 public record JoinMesaRequest(string Code, string PlayerName);
 public record SyncRequest(bool Sync);
-public record ChallengeRequest(string OpponentPlayerId);
+/// <summary>Amigo desafiado, pelo id dele na mesa (<see cref="MesaMemberView.MemberId"/>).</summary>
+public record ChallengeRequest(string OpponentMemberId);
 public record DuelChoiceRequest(int Index);
 
 /// <summary>Mesa vista por um amigo: participantes, carreiras, diário e duelos.</summary>
 public record MesaView(string Id, string Code, string Name, bool Sync, bool IsOwner, IReadOnlyList<MesaMemberView> Members,
     IReadOnlyList<MesaFeedItem> Feed, IReadOnlyList<DuelSummary> Duels);
 
-public record MesaMemberView(string PlayerId, string Name, bool Me, string? CareerId, MesaFriendView? Career, Badge? Badge, int Titles, int Goals);
+/// <summary>MemberId identifica o amigo só nesta mesa (o id de jogador dele não sai do servidor).</summary>
+public record MesaMemberView(string MemberId, string Name, bool Me, string? CareerId, MesaFriendView? Career, Badge? Badge, int Titles, int Goals);
 
 public record DuelSummary(string Id, string Kind, string Competition, string Home, string HomeClub, string Away, string AwayClub,
     int HomeGoals, int AwayGoals, bool Finished, bool Mine, bool MyTurn, DateTime CreatedAt);
@@ -43,7 +45,7 @@ public static class MesaEndpoints
         duels.MapPost("/{id}/auto", Auto).WithSummary("Decide pelo amigo que demorou demais no lance.");
     }
 
-    private static string Player(HttpContext http) => http.Request.Headers[CareerEndpoints.PlayerHeader].ToString();
+    private static string Player(HttpContext http) => CareerEndpoints.Player(http);
 
     private static async Task<Ok<List<MesaSummary>>> List(HttpContext http, Camisa10DbContext db, CancellationToken ct)
     {
@@ -161,7 +163,7 @@ public static class MesaEndpoints
         var mesa = await db.Mesas.AsNoTracking().FirstOrDefaultAsync(m => m.Id == id, ct);
         if (mesa == null || !mesa.MemberIds.Contains(me)) return TypedResults.NotFound();
         var a = mesa.Members.First(m => m.PlayerId == me);
-        var b = mesa.Members.FirstOrDefault(m => m.PlayerId == req.OpponentPlayerId);
+        var b = mesa.Members.FirstOrDefault(m => MesaService.MemberId(mesa.Id, m.PlayerId) == req.OpponentMemberId);
         if (b == null || b.PlayerId == me) return TypedResults.Problem("Escolha um amigo da mesa.", statusCode: 400);
         if (a.CareerId == null || b.CareerId == null) return TypedResults.Problem("Os dois precisam ter uma carreira na mesa.", statusCode: 400);
         var ca = await db.Careers.AsNoTracking().FirstOrDefaultAsync(c => c.Id == a.CareerId, ct);
@@ -189,7 +191,7 @@ public static class MesaEndpoints
         var members = mesa.Members.Select(m =>
         {
             var c = careers.FirstOrDefault(x => x.Id == m.CareerId);
-            return new MesaMemberView(m.PlayerId, m.Name, m.PlayerId == me, m.CareerId,
+            return new MesaMemberView(MesaService.MemberId(mesa.Id, m.PlayerId), m.Name, m.PlayerId == me, m.CareerId,
                 c == null ? null : MesaService.Friend(m, c, m.PlayerId == me), c == null ? null : ViewBuilder.BadgeFor(c.Club),
                 c?.Titles ?? 0, c == null ? 0 : c.Goals + c.SeasonMatches.Sum(x => x.Goals));
         }).ToList();
