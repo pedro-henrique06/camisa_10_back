@@ -23,7 +23,7 @@ public static class ViewBuilder
             s.Phase == GamePhase.Result && s.LastResult != null ? Result(s, s.LastResult) : null,
             // calendário e tabela vão em todas as fases, para as abas do app (Calendário, Tabela)
             s.Status == CareerStatus.Active && s.Season > 0 ? Calendar(s, engine) : null,
-            s.Phase == GamePhase.Market ? Market(s) : null,
+            s.Phase == GamePhase.Market ? Market(s, engine) : null,
             s.Phase == GamePhase.Swap ? new SwapView(s.Position, s.SwapTarget ?? s.Position) : null,
             s.Phase == GamePhase.Promotion ? new PromotionView(s.Club, BadgeFor(s.Club)) : null,
             s.Phase == GamePhase.SeasonSummary && s.LastSeason != null
@@ -323,7 +323,7 @@ public static class ViewBuilder
     }
 
     // ------------------------------------------------------------------ mercado
-    private static MarketView Market(Career s)
+    private static MarketView Market(Career s, GameEngine engine)
     {
         var mode = s.MarketMode ?? "ev";
         var intro = mode switch
@@ -340,10 +340,15 @@ public static class ViewBuilder
             return new OfferView(i, x.ClubId, x.Club, BadgeFor(x.Club), country?.Name ?? GameEngine.CountryOf(x.Club) ?? "", country?.Flag ?? "",
                 x.SigningBonus, x.Salary, x.Fee, r.Sessions, r.FocusName,
                 p is { } pl ? World.World.Country(pl.Iso).Leagues[pl.Division].Name : null,
-                p is { } pd ? World.World.DivisionLetter(pd.Division) : null);
+                p is { } pd ? World.World.DivisionLetter(pd.Division) : null, x.Contract, x.Pitched, x.Note);
         }).ToList();
+        var lp = s.LastPitch;
+        var pitch = lp == null ? null : new PitchView(lp.ClubId, lp.Club, BadgeFor(lp.Club), lp.Tier, lp.Verdict,
+            lp.Verdict switch { "accept" => $"O {lp.Club} aceitou!", "counter" => $"O {lp.Club} fez uma contraproposta", _ => $"O {lp.Club} recusou" },
+            lp.Text);
         return new MarketView(mode, intro, s.ReleaseClause, offers,
-            mode == "bt" ? "Voltar sem sair do clube" : "Ficar e negociar aumento no " + s.Club);
+            mode == "bt" ? "Voltar sem sair do clube" : "Ficar e negociar aumento no " + s.Club,
+            engine.PitchesLeft(), pitch, new[] { "Aceito ganhar menos", "Salário normal do clube", "Quero ganhar mais" });
     }
 
     // ------------------------------------------------------------------ fim de carreira (fim)

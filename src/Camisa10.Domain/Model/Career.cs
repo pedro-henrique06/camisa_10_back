@@ -29,6 +29,10 @@ public class Career
     public SeasonReport? LastSeason { get; set; }
     public List<MarketOffer> MarketOffers { get; set; } = new();
     public string? MarketMode { get; set; }
+    /// <summary>Clubes a que o jogador já se ofereceu ("temporada|janela|clube"), para não insistir no mesmo.</summary>
+    public List<string> PitchLog { get; set; } = new();
+    /// <summary>Resposta do último clube a que o jogador se ofereceu (mostrada no mercado).</summary>
+    public PitchReply? LastPitch { get; set; }
     public string? SwapTarget { get; set; }
     public bool CalendarShown { get; set; }
 
@@ -454,6 +458,22 @@ public class MarketOffer
     public double Fee { get; set; }
     public double Salary { get; set; }
     public double SigningBonus { get; set; }
+    /// <summary>Anos de contrato.</summary>
+    public int Contract { get; set; } = 3;
+    /// <summary>Veio de o jogador se oferecer ao clube (aceita ou contraproposta).</summary>
+    public bool Pitched { get; set; }
+    /// <summary>Condição da proposta (ex.: "Contraproposta: salário menor e 1 ano de contrato").</summary>
+    public string? Note { get; set; }
+}
+
+/// <summary>Resposta de um clube ao jogador que se ofereceu: "accept", "counter" ou "reject".</summary>
+public class PitchReply
+{
+    public string? ClubId { get; set; }
+    public string Club { get; set; } = "";
+    public int Tier { get; set; }
+    public string Verdict { get; set; } = "reject";
+    public string Text { get; set; } = "";
 }
 
 /// <summary>Resultado de uma escolha, exibido na tela de resultado.</summary>
