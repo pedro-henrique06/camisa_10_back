@@ -193,7 +193,7 @@ public class MesaIntegrationTests : IDisposable
     /// <summary>Joga um lado do duelo até ele acabar (as escolhas do outro lado vêm da outra chamada).</summary>
     private static async Task<bool> PlayDuel(HttpClient a, HttpClient b, string duelId)
     {
-        for (var i = 0; i < 40; i++)
+        for (var i = 0; i < 80; i++)
         {
             var progressed = false;
             foreach (var (http, pick) in new[] { (a, 0), (b, 2) })
@@ -204,6 +204,13 @@ public class MesaIntegrationTests : IDisposable
                 if (turn.GetProperty("myChoice").ValueKind == JsonValueKind.Null)
                 {
                     var r = await http.PostAsJsonAsync($"/api/duels/{duelId}/choose", new { index = (i + pick) % 3 });
+                    Assert.Equal(HttpStatusCode.OK, r.StatusCode);
+                    progressed = true;
+                }
+                else if (turn.GetProperty("stage").GetString() == "roll" && turn.GetProperty("myRoll").ValueKind == JsonValueKind.Null)
+                {
+                    // as duas jogadas escolhidas: cada um rola o próprio d20
+                    var r = await http.PostAsync($"/api/duels/{duelId}/roll", null);
                     Assert.Equal(HttpStatusCode.OK, r.StatusCode);
                     progressed = true;
                 }

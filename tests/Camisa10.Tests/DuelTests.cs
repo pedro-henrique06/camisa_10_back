@@ -11,8 +11,8 @@ public class DuelTests
     {
         var a = new Attributes { Chu = 80, Dri = 70, Pas = 60, Def = 40, Fis = 60, Rit = 70 };
         var b = new Attributes { Chu = 50, Dri = 50, Pas = 50, Def = 75, Fis = 70, Rit = 60 };
-        var d = new Duel { Id = "d1", Home = new DuelSide { PlayerId = "pa", Name = "Ana", Club = "Palmeiras", Attributes = a },
-            Away = new DuelSide { PlayerId = "pb", Name = "Beto", Club = "Corinthians", Attributes = b } };
+        var d = new Duel { Id = "d1", Home = new DuelSide { PlayerId = "pa", Name = "Ana", Club = "Palmeiras", Position = "Atacante", Attributes = a },
+            Away = new DuelSide { PlayerId = "pb", Name = "Beto", Club = "Corinthians", Position = "Zagueiro", Attributes = b } };
         DuelEngine.Setup(d, new GameRandom(seed));
         return d;
     }
@@ -30,6 +30,13 @@ public class DuelTests
             e.Choose(atk, i % 3);
             Assert.False(d.Moments[i].Resolved); // só resolve com as duas escolhas
             e.Choose(atk == "home" ? "away" : "home", (i + 1) % 3);
+            // escolhido: agora cada um rola o próprio d20
+            Assert.False(d.Moments[i].Resolved);
+            Assert.Equal("roll", e.Stage);
+            e.Roll(atk);
+            Assert.False(d.Moments[i].Resolved);
+            Assert.Throws<GameRuleException>(() => e.Roll(atk));
+            e.Roll(atk == "home" ? "away" : "home");
             Assert.True(d.Moments[i].Resolved);
         }
         Assert.True(d.Finished);
@@ -48,11 +55,42 @@ public class DuelTests
         var e = new DuelEngine(d, new GameRandom(3));
         e.Choose("home", 0);                 // chute
         Assert.Throws<GameRuleException>(() => e.Choose("home", 1));
-        e.Choose("away", 0);                 // fecha o ângulo: leu o chute
+        Assert.Throws<GameRuleException>(() => e.Roll("home")); // o dado só depois das duas escolhas
+        e.Choose("away", 0);                 // bloqueia o chute: leu o chute
+        e.Roll("home");
+        e.Roll("away");
         var m = d.Moments[0];
         Assert.True(m.Read);
         Assert.Equal(m.DefenseRoll + (75 - 50) / 5 + 4, m.DefenseTotal);
         Assert.Equal(m.AttackRoll + 6, m.AttackTotal); // chute 80 → +6, sem bônus de engano
+    }
+
+    [Fact]
+    public void Jogadas_dependem_da_posicao_e_fora_do_combate_direto_o_time_ajuda_quem_defende()
+    {
+        // atacante x zagueiro: combate direto
+        var d = NewDuel();
+        Assert.True(DuelEngine.Direct(d.Home.Position, d.Away.Position));
+        var view = DuelViews.Build(d, "home", DateTime.UtcNow);
+        Assert.True(view.Direct);
+        Assert.Equal("Atacante x Zagueiro", view.Matchup);
+        Assert.Equal("Finalizar de primeira", view.Turn!.Options[0].Label);
+        Assert.Equal("Bloquear o chute", DuelViews.Build(d, "away", DateTime.UtcNow).Turn!.Options[0].Label);
+        Assert.Equal(0, DuelViews.Build(d, "away", DateTime.UtcNow).Turn!.TeamHelp);
+        Assert.True(DuelEngine.Direct("Ponta", "Lateral"));
+        Assert.True(DuelEngine.Direct("Volante", "Meia"));
+
+        // atacante x atacante: quem defende tem a ajuda do time (+2)
+        d.Away.Position = "Atacante";
+        var e = new DuelEngine(d, new GameRandom(9));
+        Assert.Equal(DuelEngine.TeamHelp, DuelViews.Build(d, "away", DateTime.UtcNow).Turn!.TeamHelp);
+        e.Choose("home", 1);
+        e.Choose("away", 0);
+        e.Roll("home");
+        e.Roll("away");
+        var m = d.Moments[0];
+        Assert.False(m.Read);
+        Assert.Equal(m.DefenseRoll + (70 - 50) / 5 + DuelEngine.TeamHelp, m.DefenseTotal); // "voltar para bloquear" usa o físico (70)
     }
 
     [Fact]
@@ -62,6 +100,12 @@ public class DuelTests
         var e = new DuelEngine(d, new GameRandom(5));
         Assert.Throws<GameRuleException>(() => e.AutoPick("home", DateTime.UtcNow.AddMinutes(5))); // ainda não escolheu
         e.Choose("home", 2);
+        Assert.Throws<GameRuleException>(() => e.AutoPick("home", d.MomentStartedAt.AddSeconds(10)));
+        e.AutoPick("home", d.MomentStartedAt.AddSeconds(DuelEngine.AutoPickSeconds + 1));
+        Assert.Equal("roll", e.Stage);
+        // na hora do dado: primeiro o seu, depois (se o amigo sumir) o jogo rola por ele
+        Assert.Throws<GameRuleException>(() => e.AutoPick("home", DateTime.UtcNow.AddMinutes(5)));
+        e.Roll("home");
         Assert.Throws<GameRuleException>(() => e.AutoPick("home", d.MomentStartedAt.AddSeconds(10)));
         e.AutoPick("home", d.MomentStartedAt.AddSeconds(DuelEngine.AutoPickSeconds + 1));
         Assert.True(d.Moments[0].Resolved);
@@ -83,7 +127,8 @@ public class DuelTests
             c.WorldSeed = 99; c.MesaId = "m1"; c.Base = false; c.Age = 22; c.Season = 1; c.SeasonDay = 0;
             c.ClubId = World.ClubByName(club)!.Id; c.Club = club; c.LeagueName = null; c.Competitions.Clear();
             // o sorteio da temporada já sabe do amigo na mesma liga
-            new GameEngine(c) { Mesa = new MesaContext("m1", new[] { new MesaFriend(friendCareer, "x", "Amigo", friendClub, null, "") }) }.EnsureWorld();
+            // semente fixa: o teste precisa ser igual em toda execução
+            new GameEngine(c, new GameRandom(7)) { Mesa = new MesaContext("m1", new[] { new MesaFriend(friendCareer, "x", "Amigo", friendClub, null, "") }) }.EnsureWorld();
             return c;
         }
         var a = Pro("Palmeiras", "playerA1", "careerB", idB);
@@ -96,7 +141,7 @@ public class DuelTests
         {
             var act = a.Phase switch
             {
-                GamePhase.Event => new GameAction(ActionType.Choose, picker.Next(a.Current!.Options.Count)),
+                GamePhase.Event => new GameAction(ActionType.Choose, StayPick(a.Current!, picker)),
                 GamePhase.Penalty => new GameAction(ActionType.Choose, 3, 75),
                 GamePhase.Market => new GameAction(ActionType.Stay),
                 GamePhase.Swap => new GameAction(ActionType.Choose, 1),
@@ -121,5 +166,13 @@ public class DuelTests
         Assert.Equal(2, a.SeasonMatches[^1].Goals);
         Assert.Null(a.PendingDuel);
         e.Act(new GameAction(ActionType.Continue)); // segue o jogo normalmente
+    }
+
+    /// <summary>Escolha aleatória que não tira o jogador do clube (o clássico precisa acontecer).</summary>
+    private static int StayPick(GameEvent ev, Random picker)
+    {
+        static bool Moves(Fx? f) => f != null && (f.Leave is > 0 || f.NewClub != null || f.Club != null || f.Tier != null);
+        var safe = Enumerable.Range(0, ev.Options.Count).Where(i => !Moves(ev.Options[i].Success) && !Moves(ev.Options[i].Fail)).ToList();
+        return safe.Count > 0 ? safe[picker.Next(safe.Count)] : picker.Next(ev.Options.Count);
     }
 }
