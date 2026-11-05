@@ -241,18 +241,56 @@ public sealed partial class GameEngine
         return Round1(Math.Clamp(5.8 + m.MyGoals * 1.0 + m.MyAssists * .6 + m.Good * .3 - m.Bad * .35 + result, 3.5, 10));
     }
 
-    private static readonly string[] Flavor =
+    /// <summary>Narração entre os lances: o time do jogador com a bola.</summary>
+    private static readonly string[] FlavorFor =
     {
         "{team} troca passes no meio-campo.",
-        "{opp} tenta pelo lado esquerdo, mas a zaga afasta.",
-        "Falta dura no meio. O árbitro conversa com os jogadores.",
-        "Chute de longe {do opp}, por cima do gol.",
         "{team} pressiona a saída de bola.",
-        "Escanteio {para o team}. A zaga tira de cabeça.",
-        "Contra-ataque {do opp}! O lateral volta a tempo.",
-        "A torcida canta alto na arquibancada.",
         "{team} gira a bola e procura espaço.",
-        "Cartão amarelo para o volante {do opp}."
+        "O lateral {do team} apoia pela direita e cruza. A zaga afasta.",
+        "{team} tenta a tabela na entrada da área, mas a bola fica com o goleiro.",
+        "O meia {do team} arrisca de fora. A bola passa perto!",
+        "{team} empurra {o opp} para o campo de defesa.",
+        "Inversão de jogo {do team}, a bola chega no ponta.",
+        "O centroavante {do team} segura o zagueiro e espera o time subir."
+    };
+
+    /// <summary>Lances {do team} que quase viram gol.</summary>
+    private static readonly string[] ChancesFor =
+    {
+        "Escanteio {para o team}. A zaga tira de cabeça.",
+        "Chute cruzado {do team}, o goleiro espalma!",
+        "Cabeçada {do team} na trave!",
+        "O ponta {do team} passa pelo marcador e bate. Para fora."
+    };
+
+    /// <summary>O adversário com a bola.</summary>
+    private static readonly string[] FlavorAgainst =
+    {
+        "{opp} tenta pelo lado esquerdo, mas a zaga afasta.",
+        "{opp} toca a bola com paciência no campo de defesa.",
+        "{opp} adianta a marcação e aperta a saída de bola.",
+        "O volante {do opp} rouba a bola no meio e acelera.",
+        "{opp} cruza na área, o goleiro {do team} sai bem e fica com ela."
+    };
+
+    /// <summary>Lances {do opp} que quase viram gol.</summary>
+    private static readonly string[] ChancesAgainst =
+    {
+        "Chute de longe {do opp}, por cima do gol.",
+        "Contra-ataque {do opp}! O lateral volta a tempo.",
+        "O atacante {do opp} cabeceia e o goleiro {do team} faz a defesa!",
+        "{opp} na cara do gol... e a zaga salva em cima da linha!"
+    };
+
+    /// <summary>Clima do jogo (ninguém com a bola).</summary>
+    private static readonly string[] FlavorNeutral =
+    {
+        "Falta dura no meio. O árbitro conversa com os jogadores.",
+        "A torcida canta alto na arquibancada.",
+        "Cartão amarelo para o volante {do opp}.",
+        "Jogo truncado, muitas faltas no meio-campo.",
+        "O técnico {do team} pede calma na beira do campo."
     };
 
     private static readonly string[] GoalsFor =
@@ -283,7 +321,10 @@ public sealed partial class GameEngine
         var edge = cup ? 0 : (s.Tier - m.OpponentTier) * .28 + (m.Home ? .12 : -.12);
         var pFor = GoalsPerGame * Math.Exp(edge) / 90;
         var pAgainst = GoalsPerGame * Math.Exp(-edge) / 90;
-        var flavorLeft = Math.Clamp((to - m.Minute) / 18, 1, 3);
+        // narração viva: um lance a cada 6 ou 7 minutos, mais ou menos (ataques dos dois lados)
+        var span = Math.Max(1, to - m.Minute);
+        var flavorLeft = Math.Clamp(span / 6, 2, 12);
+        var flavorRate = (flavorLeft + .5) / span;
         for (var min = m.Minute + 1; min <= to; min++)
         {
             if (min == 46 && !m.Feed.Any(l => l.Text.StartsWith("Intervalo"))) Line(45, $"Intervalo: {Score(m)}.", "whistle");
@@ -302,11 +343,15 @@ public sealed partial class GameEngine
                 m.Against++;
                 Line(min, Fill(Pick(GoalsAgainst)), "goal-against");
             }
-            else if (flavorLeft > 0 && Rand() < 2.2 / Math.Max(1, to - m.Minute))
+            else if (flavorLeft > 0 && Rand() < flavorRate)
             {
                 flavorLeft--;
-                var t = Fill(Pick(Flavor));
-                Line(min, t, t.StartsWith("Chute") || t.StartsWith("Contra") ? "chance-against" : t.StartsWith("Escanteio") ? "chance-for" : "info");
+                // quem ataca segue a força dos times
+                var mine = Rand() < .5 + edge * .35;
+                var r = Rand();
+                if (r < .14) Line(min, Fill(Pick(FlavorNeutral)), "info");
+                else if (r < .38) Line(min, Fill(Pick(mine ? ChancesFor : ChancesAgainst)), mine ? "chance-for" : "chance-against");
+                else Line(min, Fill(Pick(mine ? FlavorFor : FlavorAgainst)), mine ? "attack-for" : "attack-against");
             }
             m.Minute = min;
         }
