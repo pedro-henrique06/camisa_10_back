@@ -20,7 +20,7 @@ public sealed partial class GameEngine
     /// <summary>Chance diária de lesão grave (gp).</summary>
     private double SeriousInjuryChance() =>
         (.003 + Math.Max(0, 60 - s.Fitness) / 1500.0 + s.Wear * .004 + (s.Age > 29 ? (s.Age - 29) * .0015 : 0))
-        * Math.Max(.45, 1 - Equipment.Recovery(s) * .15);
+        * Math.Max(.45, 1 - Equipment.Recovery(s) * .15) * Difficulty.Injury(s);
 
     /// <summary>Lesão grave (DY.lg). Algumas (hérnia, concussão, coração) podem encerrar a carreira, conforme a escolha.</summary>
     internal GameEvent SeriousInjury()

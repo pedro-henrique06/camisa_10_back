@@ -87,7 +87,9 @@ public static class ViewBuilder
             new("ambicao", "Tranquilo", "Ambicioso", C(r.Ambition)),
             new("disciplina", "Indisciplinado", "Profissional", C(r.Discipline)),
         };
-        return new StoryView(o?.Id, o?.Name, o?.Icon, o?.Text, Story.Tags(s).Select(x => new RepTagView(x.Icon, x.Label, x.Hint)).ToList(), axes, s.Epilogue);
+        var level = Difficulty.Of(s);
+        return new StoryView(o?.Id, o?.Name, o?.Icon, o?.Text, Story.Tags(s).Select(x => new RepTagView(x.Icon, x.Label, x.Hint)).ToList(), axes, s.Epilogue,
+            level.Id, level.Name, level.Icon);
     }
 
     private static BusinessView BusinessOf(Career s, GameEngine engine)
@@ -471,7 +473,8 @@ public static class ViewBuilder
                 .Where(w => w.Value > 0)
                 .OrderByDescending(w => w.Value)
                 .Select(w => new WeightView(w.Key, GameData.AttributeNames[w.Key], (int)Math.Round(w.Value * 100)))
-                .ToList())).ToList());
+                .ToList())).ToList(),
+        Difficulty.Levels.Select(l => new DifficultyOption(l.Id, l.Name, l.Icon, l.Description)).ToList());
 
     // ------------------------------------------------------------------ escudos (badge)
     /// <summary>Cores das camisas das principais seleções (as outras usam a cor do nome).</summary>

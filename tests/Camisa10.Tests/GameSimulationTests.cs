@@ -7,11 +7,12 @@ namespace Camisa10.Tests;
 public class GameSimulationTests
 {
     /// <summary>Joga uma carreira inteira escolhendo opções aleatórias.</summary>
-    internal static (Career Career, int Steps) PlayToEnd(int seed, string position = "Meia", string club = "Flamengo", Action<Career>? onStep = null)
+    internal static (Career Career, int Steps) PlayToEnd(int seed, string position = "Meia", string club = "Flamengo", Action<Career>? onStep = null,
+        string? difficulty = null)
     {
         var rng = new GameRandom(seed);
         var picker = new Random(seed);
-        var career = GameEngine.NewCareer("player", "Teste", club, "Brasil", position, rng);
+        var career = GameEngine.NewCareer("player", "Teste", club, "Brasil", position, rng, difficulty);
         var engine = new GameEngine(career, rng);
         var steps = 0;
         while (career.Status == CareerStatus.Active)
