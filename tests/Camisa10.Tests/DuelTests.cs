@@ -83,7 +83,8 @@ public class DuelTests
             c.WorldSeed = 99; c.MesaId = "m1"; c.Base = false; c.Age = 22; c.Season = 1; c.SeasonDay = 0;
             c.ClubId = World.ClubByName(club)!.Id; c.Club = club; c.LeagueName = null; c.Competitions.Clear();
             // o sorteio da temporada já sabe do amigo na mesma liga
-            new GameEngine(c) { Mesa = new MesaContext("m1", new[] { new MesaFriend(friendCareer, "x", "Amigo", friendClub, null, "") }) }.EnsureWorld();
+            // semente fixa: o teste precisa ser igual em toda execução
+            new GameEngine(c, new GameRandom(7)) { Mesa = new MesaContext("m1", new[] { new MesaFriend(friendCareer, "x", "Amigo", friendClub, null, "") }) }.EnsureWorld();
             return c;
         }
         var a = Pro("Palmeiras", "playerA1", "careerB", idB);
@@ -96,7 +97,7 @@ public class DuelTests
         {
             var act = a.Phase switch
             {
-                GamePhase.Event => new GameAction(ActionType.Choose, picker.Next(a.Current!.Options.Count)),
+                GamePhase.Event => new GameAction(ActionType.Choose, StayPick(a.Current!, picker)),
                 GamePhase.Penalty => new GameAction(ActionType.Choose, 3, 75),
                 GamePhase.Market => new GameAction(ActionType.Stay),
                 GamePhase.Swap => new GameAction(ActionType.Choose, 1),
@@ -121,5 +122,13 @@ public class DuelTests
         Assert.Equal(2, a.SeasonMatches[^1].Goals);
         Assert.Null(a.PendingDuel);
         e.Act(new GameAction(ActionType.Continue)); // segue o jogo normalmente
+    }
+
+    /// <summary>Escolha aleatória que não tira o jogador do clube (o clássico precisa acontecer).</summary>
+    private static int StayPick(GameEvent ev, Random picker)
+    {
+        static bool Moves(Fx? f) => f != null && (f.Leave is > 0 || f.NewClub != null || f.Club != null || f.Tier != null);
+        var safe = Enumerable.Range(0, ev.Options.Count).Where(i => !Moves(ev.Options[i].Success) && !Moves(ev.Options[i].Fail)).ToList();
+        return safe.Count > 0 ? safe[picker.Next(safe.Count)] : picker.Next(ev.Options.Count);
     }
 }

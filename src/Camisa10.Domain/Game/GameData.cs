@@ -100,6 +100,15 @@ public static class GameData
         "n_nam", "n_bet", "n_viz", "n_pai", "n_pod", "n_fac", "n_cp", "n_sol", "n_mal", "n_ins", "n_fer"
     };
 
+    /// <summary>
+    /// Imprevistos pessoais que cansam se aparecem toda hora (assalto, cano estourado, cachorro...):
+    /// voltam só depois de muitas temporadas.
+    /// </summary>
+    public static readonly HashSet<string> Rare = new()
+    {
+        "cac", "ro", "cano", "int", "sort", "dnt", "n_pai", "n_viz", "irm", "bri", "imp", "n_mal", "hosp", "cart", "pre", "reen"
+    };
+
     public static readonly HashSet<string> Training = new()
     {
         "tfoco", "tre", "tr1", "tr2", "tr3", "tr4", "tr5", "tr6", "tr7", "tr8", "tr9", "tr10", "tr11", "tr12", "tr13", "tr14",

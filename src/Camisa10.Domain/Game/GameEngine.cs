@@ -203,9 +203,9 @@ public sealed partial class GameEngine
             return;
         }
 
-        GameEvent? personal = PickFromPool(id => GameData.Personal.Contains(id));
+        GameEvent? personal = PickFromPool(IsPersonal);
         GameEvent? training = PickFromPool(id => GameData.Training.Contains(id));
-        GameEvent? career = PickFromPool(id => !GameData.Personal.Contains(id) && !GameData.Training.Contains(id) &&
+        GameEvent? career = PickFromPool(id => !IsPersonal(id) && !GameData.Training.Contains(id) &&
                                               !GameData.ArcStarts.Contains(id) && (!s.Base || GameData.BaseAllowed.Contains(id)));
         GameEvent? arc = PickFromPool(id => GameData.ArcStarts.Contains(id));
 
@@ -272,31 +272,52 @@ public sealed partial class GameEngine
             return;
         }
 
+        // a vida fora de campo aparece em boa parte dos dias, não em todos
         GameEvent next;
-        if (personal != null) next = personal;
+        if (personal != null && (s.Queue.Count == 0 || Rand() < .55)) next = personal;
         else if (s.Queue.Count > 0) { next = s.Queue[0]; s.Queue.RemoveAt(0); }
         else next = Events.Jogo.ToEvent();
         Show(next);
     }
 
-    /// <summary>Sorteia um evento do catálogo que respeite a condição e o tempo de recarga (pl).</summary>
+    /// <summary>Evento da vida fora de campo (os originais e os de cada fase da carreira).</summary>
+    private static bool IsPersonal(string id) => GameData.Personal.Contains(id) || Events.LifeIds.Contains(id);
+
+    /// <summary>
+    /// Sorteia um evento do catálogo que respeite a condição e o tempo de recarga (pl). Os pessoais voltam
+    /// só depois de 2 a 3 temporadas (os imprevistos, bem mais), e os que você nunca viu e os da sua
+    /// fase da vida têm mais chance.
+    /// </summary>
     private GameEvent? PickFromPool(Func<string, bool> filter)
     {
-        var options = Events.All.Where(v =>
+        var options = Events.Every.Where(v =>
         {
             if (!filter(v.Id)) return false;
             var last = s.LastUsed(v.Id);
             if (last is { } d && d != 0)
             {
-                var cooldown = GameData.Personal.Contains(v.Id) ? 24 : GameData.Training.Contains(v.Id) ? 15 : GameData.Big.Contains(v.Id) ? 120 : 30;
+                var cooldown = GameData.Rare.Contains(v.Id) ? 150
+                    : IsPersonal(v.Id) ? 60
+                    : GameData.Training.Contains(v.Id) ? 15
+                    : GameData.Big.Contains(v.Id) ? 120 : 30;
                 if (s.Day - d < cooldown) return false;
             }
             return v.Condition(s);
         }).ToList();
-        return options.Count == 0 ? null : Pick(options).ToEvent();
+        if (options.Count == 0) return null;
+        double Weight(EventDef v) =>
+            (Events.LifeIds.Contains(v.Id) ? 3 : 1) * (s.LastUsed(v.Id) == null ? 2 : 1) * (GameData.Rare.Contains(v.Id) ? .5 : 1);
+        var total = options.Sum(Weight);
+        var roll = Rand() * total;
+        foreach (var v in options)
+        {
+            roll -= Weight(v);
+            if (roll <= 0) return v.ToEvent();
+        }
+        return options[^1].ToEvent();
     }
 
-    private static readonly Dictionary<string, EventDef> CatalogById = Events.All.ToDictionary(e => e.Id);
+    private static readonly Dictionary<string, EventDef> CatalogById = Events.Every.ToDictionary(e => e.Id);
     private static EventDef? Catalog(string id) => CatalogById.GetValueOrDefault(id);
 
     /// <summary>Exibe um evento (show).</summary>
