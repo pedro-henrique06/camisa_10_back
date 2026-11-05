@@ -158,6 +158,20 @@ por acesso ou rebaixamento recente; para corrigir, edite a lista e regere:
   (menino ganha a opção Júnior; gêmeos vêm em pares). Cada filho tem nome, sexo, mãe e idade, custa R$ 0,2 mi por
   temporada e aumenta a família. Conforme crescem, trazem decisões: febre na véspera de clássico (0 a 8 anos),
   aniversário em dia de jogo (1 a 15), escola (4 a 7), quer ser jogador (6 a 13) e confusão na escola (13 a 18).
+- **Cada carreira é diferente** (`Story.cs`, `Events.Story.cs`):
+  - **Origem sorteada** (8): cria da comunidade, filho de ex-jogador, família rica, menino do interior, criado
+    pela avó, filho de pastor, reprovado em dez peneiras, famoso nas redes. Muda dinheiro, fama e família no
+    começo, abre a carreira com uma escolha e libera arcos próprios.
+  - **Reputação** (`Rep`, 6 eixos): caráter, lealdade, polêmica, solidariedade, ambição e disciplina, mudados pelo
+    campo `Rep` das escolhas (e por trocar de clube ou ficar). Vira rótulos ("Exemplo de caráter", "Mercenário",
+    "Polêmico"...), libera eventos (marca de luxo só para imagem limpa, casa de apostas só para quem não é),
+    muda o salário das propostas e faz clubes grandes evitarem jogador polêmico ou indisciplinado.
+  - **Arcos com consequências atrasadas**: amigo de infância no crime, máfia das apostas (pode banir do
+    futebol), doping, mentor que vira técnico, saúde mental, política, música, jornalista, torcida organizada,
+    o clube onde tudo começou, proposta do rival e os arcos de cada origem.
+  - **Destino**: cada carreira vive só parte das histórias (40% dos eventos fora de campo e metade dos arcos
+    ficam de fora, pela semente da carreira).
+  - **Epílogo**: no fim, frases montadas a partir da origem, dos arcos, da família, do patrimônio e da reputação.
 - **Negócios e investimentos** (`Business.cs`, `GameEngine.Business.cs`, `Events.Business.cs`): o jogador abre
   quantas empresas quiser (ação `OpenCompany`): hamburgueria, academia, escolinha de futebol, restaurante, marca de
   roupas, posto, prédio para alugar e startup. Cada uma tem custo, lucro médio e risco; as de marca rendem mais com

@@ -186,5 +186,5 @@ public static partial class Events
     private static IReadOnlyList<EventDef>? _every;
 
     /// <summary>Catálogo completo: os eventos originais e os de vida por idade.</summary>
-    public static IReadOnlyList<EventDef> Every => _every ??= All.Concat(Life).Concat(CareerMoves).Concat(Romance).Concat(BusinessEvents).ToList();
+    public static IReadOnlyList<EventDef> Every => _every ??= All.Concat(Life).Concat(CareerMoves).Concat(Romance).Concat(BusinessEvents).Concat(StoryEvents).ToList();
 }

@@ -70,7 +70,24 @@ public static class ViewBuilder
             s.SeasonDay >= 1 ? SeasonCalendar.Label(SeasonCalendar.At(s.CalendarType, s.SeasonDay)) : null,
             engine.LeaguePosition(), s.LeagueTable.Count, TrophyRoom(s), Home(s), Love(s),
             s.Gossip.AsEnumerable().Reverse().Take(15).Select(g => new GossipView(g.Age, g.Outlet, g.Headline, g.Kind)).ToList(),
-            BusinessOf(s, engine));
+            BusinessOf(s, engine), StoryOf(s));
+    }
+
+    private static StoryView StoryOf(Career s)
+    {
+        var o = Story.Find(s.Origin);
+        var r = s.Rep;
+        int C(int v) => Math.Clamp(v, -10, 10);
+        var axes = new List<RepAxisView>
+        {
+            new("carater", "Malandro", "Honesto", C(r.Character)),
+            new("lealdade", "Mercenário", "Fiel", C(r.Loyalty)),
+            new("polemica", "Discreto", "Polêmico", C(r.Controversy)),
+            new("solidario", "Egoísta", "Solidário", C(r.Charity)),
+            new("ambicao", "Tranquilo", "Ambicioso", C(r.Ambition)),
+            new("disciplina", "Indisciplinado", "Profissional", C(r.Discipline)),
+        };
+        return new StoryView(o?.Id, o?.Name, o?.Icon, o?.Text, Story.Tags(s).Select(x => new RepTagView(x.Icon, x.Label, x.Hint)).ToList(), axes, s.Epilogue);
     }
 
     private static BusinessView BusinessOf(Career s, GameEngine engine)

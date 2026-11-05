@@ -31,6 +31,7 @@ public class Camisa10DbContext(DbContextOptions<Camisa10DbContext> options) : Db
         modelBuilder.Owned<RomanceMilestone>();
         modelBuilder.Owned<Child>();
         modelBuilder.Owned<Company>();
+        modelBuilder.Owned<Reputation>();
         modelBuilder.Owned<CompanyYear>();
         modelBuilder.Owned<Investment>();
         modelBuilder.Owned<InvestmentYear>();
