@@ -3,7 +3,8 @@ using Camisa10.Domain.Game;
 namespace Camisa10.Api.Endpoints;
 
 /// <param name="Club">Id do clube no mundo (de /api/world). O nome também é aceito.</param>
-public record NewCareerRequest(string? Name, string Club, string Nation, string Position);
+/// <param name="Difficulty">facil, normal (padrão) ou dificil. No difícil, um clube fora da última divisão é trocado por um sorteado de lá.</param>
+public record NewCareerRequest(string? Name, string Club, string Nation, string Position, string? Difficulty = null);
 
 /// <summary>
 /// Ação do jogador. <c>Version</c> é a versão da carreira que o app estava mostrando;

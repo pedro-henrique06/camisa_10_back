@@ -158,6 +158,12 @@ por acesso ou rebaixamento recente; para corrigir, edite a lista e regere:
   (menino ganha a opção Júnior; gêmeos vêm em pares). Cada filho tem nome, sexo, mãe e idade, custa R$ 0,2 mi por
   temporada e aumenta a família. Conforme crescem, trazem decisões: febre na véspera de clássico (0 a 8 anos),
   aniversário em dia de jogo (1 a 15), escola (4 a 7), quer ser jogador (6 a 13) e confusão na escola (13 a 18).
+- **Dificuldade** (`Difficulty.cs`, campo `difficulty` ao criar a carreira):
+  - **Fácil**: +R$ 10 mi, potencial 82 a 97, salários 30% maiores, 30% menos lesões, +2 no d20, uma proposta a mais.
+  - **Normal**: como sempre.
+  - **Difícil**: origem humilde (comunidade, avó, peneiras ou interior), R$ 0,2 mi, base num clube da última
+    divisão do país (se o clube escolhido não for de lá, é sorteado um da Série C), potencial 66 a 88, salários
+    25% menores, 30% mais lesões, −2 no d20 e uma proposta a menos.
 - **Cada carreira é diferente** (`Story.cs`, `Events.Story.cs`):
   - **Origem sorteada** (8): cria da comunidade, filho de ex-jogador, família rica, menino do interior, criado
     pela avó, filho de pastor, reprovado em dez peneiras, famoso nas redes. Muda dinheiro, fama e família no

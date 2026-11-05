@@ -117,7 +117,7 @@ public static class MesaEndpoints
         Career career;
         try
         {
-            career = GameEngine.NewCareer(me, req.Name ?? member.Name, req.Club, req.Nation, req.Position);
+            career = GameEngine.NewCareer(me, req.Name ?? member.Name, req.Club, req.Nation, req.Position, difficulty: req.Difficulty);
         }
         catch (GameRuleException e)
         {

@@ -98,7 +98,8 @@ public record HudView(
 
 /// <param name="Reputation">Eixos da reputação (−10 a +10 para o app desenhar).</param>
 public record StoryView(string? Origin, string? OriginName, string? OriginIcon, string? OriginText, IReadOnlyList<RepTagView> Tags,
-    IReadOnlyList<RepAxisView> Reputation, IReadOnlyList<string> Epilogue);
+    IReadOnlyList<RepAxisView> Reputation, IReadOnlyList<string> Epilogue, string Difficulty = "normal", string DifficultyName = "Normal",
+    string DifficultyIcon = "⚽");
 
 public record RepTagView(string Icon, string Label, string Hint);
 
@@ -337,7 +338,10 @@ public record MetaView(
     IReadOnlyList<ClubOption> BaseClubs,
     IReadOnlyList<NationOption> Nations,
     IReadOnlyList<string> Positions,
-    IReadOnlyList<PositionOption> PositionInfo);
+    IReadOnlyList<PositionOption> PositionInfo,
+    IReadOnlyList<DifficultyOption>? Difficulties = null);
+
+public record DifficultyOption(string Id, string Name, string Icon, string Description);
 
 // ---------------------------------------------------------------- mundo (escolha de clube)
 

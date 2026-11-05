@@ -90,7 +90,7 @@ public static partial class CareerEndpoints
         Career career;
         try
         {
-            career = GameEngine.NewCareer(Player(http), req.Name ?? "", req.Club, req.Nation, req.Position);
+            career = GameEngine.NewCareer(Player(http), req.Name ?? "", req.Club, req.Nation, req.Position, difficulty: req.Difficulty);
         }
         catch (GameRuleException e)
         {

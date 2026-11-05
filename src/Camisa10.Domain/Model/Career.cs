@@ -152,6 +152,8 @@ public class Career
     public List<Investment> Investments { get; set; } = new();
     /// <summary>Empresa de que o evento atual fala.</summary>
     public string? FocusCompany { get; set; }
+    /// <summary>facil, normal ou dificil (ver <see cref="Game.Difficulty"/>).</summary>
+    public string Difficulty { get; set; } = "normal";
     /// <summary>Origem sorteada no começo da carreira (ver <see cref="Game.Story"/>).</summary>
     public string? Origin { get; set; }
     /// <summary>Reputação formada pelas escolhas.</summary>

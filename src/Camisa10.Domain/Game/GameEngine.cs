@@ -31,10 +31,21 @@ public sealed partial class GameEngine
 
     // ------------------------------------------------------------------ nova carreira (start)
     /// <param name="baseClub">Id do clube no mundo (ou o nome, para compatibilidade).</param>
-    public static Career NewCareer(string playerId, string name, string baseClub, string nation, string position, IGameRandom? rng = null)
+    public static Career NewCareer(string playerId, string name, string baseClub, string nation, string position, IGameRandom? rng = null,
+        string? difficulty = null)
     {
+        rng ??= new GameRandom();
+        var level = Difficulty.Normalize(difficulty);
         var club = World.World.Club(baseClub) ?? World.World.ClubByName(baseClub)
                    ?? throw new GameRuleException($"Clube de base inválido: {baseClub}");
+        if (level == "dificil")
+        {
+            // difícil: a base é de um clube da última divisão do país (se escolheu outro, sorteia um de lá)
+            var leagues = World.World.Country(club.CountryIso).Leagues;
+            var lowest = leagues[^1];
+            if (World.World.InitialDivision(club.Id) != lowest.Division)
+                club = lowest.Clubs[(int)Math.Floor(rng.Next() * lowest.Clubs.Count)];
+        }
         if (!GameData.Positions.Contains(position)) throw new GameRuleException($"Posição inválida: {position}");
         if (World.World.CountryByName(nation) == null) throw new GameRuleException($"Seleção inválida: {nation}");
         var baseTier = World.World.Tier(club.CountryIso, World.World.InitialDivision(club.Id), club.Prestige);
@@ -65,17 +76,21 @@ public sealed partial class GameEngine
             Family = 50,
             Friends = 50,
             Agent = 50,
-            RivalOverall = 55
+            RivalOverall = 55,
+            Difficulty = level
         };
         var engine = new GameEngine(c, rng);
         c.WorldSeed = engine.R(1, 1_000_000_000);
-        c.Potential = engine.R(72, 94);
+        c.Potential = level switch { "facil" => engine.R(82, 97), "dificil" => engine.R(66, 88), _ => engine.R(72, 94) };
         c.Rival = GameData.Rivals[engine.R(0, 4)];
         c.Attributes = engine.MakeAttributes(position, 55);
         // cada carreira começa com uma história diferente
-        var origin = Story.Origins[engine.R(0, Story.Origins.Count - 1)];
+        var pool = level == "dificil" ? Story.Origins.Where(o => Difficulty.PoorOrigins.Contains(o.Id)).ToList() : Story.Origins.ToList();
+        var origin = pool[engine.R(0, pool.Count - 1)];
         c.Origin = origin.Id;
         origin.Setup(c);
+        if (level == "dificil") { c.Money = .2; c.Trust -= 8; }
+        if (level == "facil") { c.Money += 10; c.Trust += 5; }
         engine.StartSeason();
         if (Catalog("o_" + origin.Id) is { } intro) engine.Show(intro.ToEvent()); // a primeira tela é a história da origem
         return c;
@@ -410,7 +425,7 @@ public sealed partial class GameEngine
         if (!(ev.IsMatch || IsCupEvent(ev) || o.Attribute != null)) return null;
         var a = o.Attribute ?? AttributeFromText(o.Label + " " + ev.Title) ?? TopAttribute();
         var v = s.Attributes[a];
-        var mod = (int)Math.Floor((v - 50) / 6.0);
+        var mod = (int)Math.Floor((v - 50) / 6.0) + Difficulty.Dice(s);
         var dc = Clamp(21 - Round(pr.Value * 20), 2, 20);
         return new DiceRoll { Attribute = a, Value = v, Modifier = mod, Difficulty = dc };
     }
@@ -794,7 +809,7 @@ public sealed partial class GameEngine
             AddTrophy(s.Base ? "Campeonato de Base" : s.LeagueName ?? "Campeonato nacional", "league", CleanClub(s.Club));
         }
 
-        var gross = s.Salary * 12 / 1000 + (s.Base ? 0 : gl * (double)s.GoalBonus / 1000);
+        var gross = (s.Salary * 12 / 1000 + (s.Base ? 0 : gl * (double)s.GoalBonus / 1000)) * Difficulty.Income(s);
         var com = s.Has("emp") ? Round(gross * 10) / 100.0 : 0;
         var net = Round2(gross * .73 - com);
         var spent = Round2(net * (s.Has("fin") ? .25 : .4));
@@ -918,7 +933,7 @@ public sealed partial class GameEngine
     /// </summary>
     private void Market(string mode)
     {
-        var n = mode == "ev" ? 3 : 4;
+        var n = Math.Max(1, (mode == "ev" ? 3 : 4) + Difficulty.Offers(s));
         var offers = new List<MarketOffer>();
         for (var i = 0; i < 16 && offers.Count < n; i++)
         {
