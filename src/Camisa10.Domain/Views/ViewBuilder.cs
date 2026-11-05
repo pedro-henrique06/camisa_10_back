@@ -68,7 +68,31 @@ public static class ViewBuilder
             s.Status == CareerStatus.Active && engine.CanSearchClub(),
             Enumerable.Range(1, GameEngine.SeasonDays).Select(n => s.Competitions.FirstOrDefault(c => c.Days.Contains(n))?.Kind).ToList(),
             s.SeasonDay >= 1 ? SeasonCalendar.Label(SeasonCalendar.At(s.CalendarType, s.SeasonDay)) : null,
-            engine.LeaguePosition(), s.LeagueTable.Count, TrophyRoom(s));
+            engine.LeaguePosition(), s.LeagueTable.Count, TrophyRoom(s), Home(s));
+    }
+
+    /// <summary>A casa do jogador: equipamentos para comprar e o efeito de cada um na idade atual.</summary>
+    private static HomeView Home(Career s)
+    {
+        var items = Equipment.All.Select(i =>
+        {
+            var owned = s.Equipment.Contains(i.Id);
+            string effect;
+            if (i.Attr != null)
+            {
+                var name = GameData.AttributeNames[i.Attr];
+                var per = s.Age <= 24 ? 4 : s.Age <= 29 ? 8 : 14;
+                effect = $"{name}: +{per}% de chance de evoluir no treino e menos queda com a idade";
+                if (i.Recovery > 0) effect += ", recupera o físico";
+            }
+            else effect = (i.Longevity > 0 ? "Menos lesões e desgaste, e mais um ano de carreira" : "Menos lesões, menos desgaste e físico mais alto");
+            var locked = i.Requires != null && !s.Equipment.Contains(i.Requires) ? $"Precisa de {Equipment.Find(i.Requires)!.Name.ToLowerInvariant()}" : null;
+            return new HomeItemView(i.Id, i.Name, i.Icon, i.Description, i.Price, i.PerSeason, owned, s.Money >= i.Price, effect, locked);
+        }).ToList();
+        var note = s.Age <= 21 ? "Jovem, você evolui rápido só com o treino do clube. Os equipamentos ajudam pouco por enquanto."
+            : s.Age <= 29 ? "No auge, a evolução fica mais lenta. Os equipamentos já fazem diferença."
+            : "Depois dos 30, evoluir é difícil e o corpo começa a cair. Os equipamentos seguram o declínio e alongam a carreira.";
+        return new HomeView(s.Money, Equipment.Upkeep(s), note, items);
     }
 
     /// <summary>Ordem das competições na sala de troféus: prêmios, seleção, continental, liga, copa, estadual.</summary>

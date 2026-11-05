@@ -10,4 +10,8 @@
     <EmbeddedResource Include="Data/world.json" LogicalName="world.json" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="Camisa10.Tests" />
+  </ItemGroup>
+
 </Project>

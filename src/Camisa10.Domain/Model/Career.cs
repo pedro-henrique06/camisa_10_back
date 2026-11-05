@@ -144,6 +144,10 @@ public class Career
 
     public Traits Traits { get; set; } = new();
     public List<string> Flags { get; set; } = new();
+    /// <summary>Equipamentos e profissionais da casa do jogador (ids de <c>Equipment.All</c>).</summary>
+    public List<string> Equipment { get; set; } = new();
+    /// <summary>Concussões na carreira (a terceira pode encerrar a carreira).</summary>
+    public int Concussions { get; set; }
     public List<UsedEvent> Used { get; set; } = new();
     public List<ScheduledEvent> Scheduled { get; set; } = new();
     public List<string> Headlines { get; set; } = new();
