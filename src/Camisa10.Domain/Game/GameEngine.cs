@@ -338,7 +338,7 @@ public sealed partial class GameEngine
             {
                 var cooldown = v.Id == "r_bebe_plano" ? 20
                     : GameData.Rare.Contains(v.Id) ? 150
-                    : IsPersonal(v.Id) ? 60
+                    : IsPersonal(v.Id) ? 60 + 30 * Math.Max(0, s.TimesUsed(v.Id) - 1) // repetido demais, demora mais a voltar
                     : GameData.Training.Contains(v.Id) ? 15
                     : GameData.Big.Contains(v.Id) ? 120 : 30;
                 if (s.Day - d < cooldown) return false;

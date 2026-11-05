@@ -177,11 +177,13 @@ public class Career
     public void SetFlag(string flag) { if (!Flags.Contains(flag)) Flags.Add(flag); }
 
     public int? LastUsed(string id) => Used.FirstOrDefault(u => u.EventId == id)?.Day;
+    /// <summary>Quantas vezes o evento já apareceu (0 em carreiras antigas, antes da contagem).</summary>
+    public int TimesUsed(string id) => Used.FirstOrDefault(u => u.EventId == id)?.Times ?? 0;
     public void MarkUsed(string id)
     {
         var u = Used.FirstOrDefault(x => x.EventId == id);
-        if (u == null) Used.Add(new UsedEvent { EventId = id, Day = Day });
-        else u.Day = Day;
+        if (u == null) Used.Add(new UsedEvent { EventId = id, Day = Day, Times = 1 });
+        else { u.Day = Day; u.Times++; }
     }
 }
 
@@ -285,6 +287,8 @@ public class UsedEvent
 {
     public string EventId { get; set; } = "";
     public int Day { get; set; }
+    /// <summary>Vezes que apareceu: cada repetição deixa o evento mais tempo sem voltar.</summary>
+    public int Times { get; set; }
 }
 
 public class ScheduledEvent
