@@ -26,6 +26,11 @@ public sealed partial class GameEngine
         "estudante de engenharia", "atriz de novela", "fisioterapeuta", "empresária", "professora", "chef de cozinha"
     };
 
+    private static readonly string[] BoyNames =
+        { "Pedro", "Miguel", "Arthur", "Davi", "Gael", "Theo", "Heitor", "Ravi", "Bernardo", "Samuel", "Lorenzo", "Benício", "Joaquim", "Benjamin", "Bento", "Enzo" };
+    private static readonly string[] GirlNames =
+        { "Helena", "Alice", "Laura", "Maria", "Cecília", "Valentina", "Heloísa", "Liz", "Manuela", "Aurora", "Antonella", "Lívia", "Maitê", "Eloá", "Isis", "Clara" };
+
     public static readonly string[] CommittedStages = { "ficando", "namorando", "noivo", "casado" };
 
     /// <summary>Uma pessoa nova para o evento de conhecer alguém.</summary>
@@ -41,6 +46,7 @@ public sealed partial class GameEngine
     private void FillRomance(GameEvent ev)
     {
         if (ev.EventId == "r_conhece") NewCandidate();
+        if (ev.EventId is "r_bebe_plano" or "r_nasceu") NameBabies();
         string F(string? t) => t == null ? "" : RomanceText(t);
         if (!(ev.Title + ev.Text).Contains('{') && !ev.Options.Any(o => (o.Label + o.SuccessText + o.FailText).Contains('{'))) return;
         ev.Title = F(ev.Title);
@@ -53,7 +59,28 @@ public sealed partial class GameEngine
         }
     }
 
+    /// <summary>Sorteia o nome do bebê (ou dos gêmeos), sem repetir o de um irmão.</summary>
+    private void NameBabies()
+    {
+        string Pick()
+        {
+            var pool = R(0, 1) == 0 ? BoyNames : GirlNames;
+            var free = pool.Where(n => s.Love.Children.All(c => c.Name != n) && n != s.Love.BabyName).ToList();
+            return free.Count > 0 ? free[R(0, free.Count - 1)] : pool[R(0, pool.Length - 1)] + " " + (s.Love.Children.Count + 1);
+        }
+        s.Love.BabyName = Pick();
+        s.Love.BabyName2 = s.Love.Twins ? Pick() : null;
+    }
+
+    private string Babies => s.Love.BabyName2 != null ? $"{s.Love.BabyName} e {s.Love.BabyName2}" : s.Love.BabyName ?? "o bebê";
+
     private string RomanceText(string t) => t
+        .Replace("{mae}", s.Love.ExpectingWith ?? s.Love.Partner ?? "a mãe")
+        .Replace("{bebe}", Babies)
+        .Replace("{nasceu}", s.Love.Twins ? $"Nasceram os gêmeos {Babies}!" : $"Nasceu {Babies}!")
+        .Replace("{gemeos}", s.Love.Twins ? " de gêmeos" : "")
+        .Replace("{mais}", s.Love.Children.Count > 0 ? "mais " : "")
+        .Replace("{filhos}", s.Love.Children.Count switch { 0 => "nenhum filho", 1 => "um filho", var n => $"{n} filhos" })
         .Replace("{par}", s.Love.Partner ?? "a pessoa amada")
         .Replace("{prof}", s.Love.PartnerJob ?? "")
         .Replace("{nome}", s.Name);
@@ -125,14 +152,54 @@ public sealed partial class GameEngine
             if (love.Affection < 20 && !s.Scheduled.Any(x => x.EventId == "r_termino"))
                 s.Scheduled.Add(new ScheduledEvent { EventId = "r_termino", At = s.Day + 1 });
         }
+        if (d.Baby is { } baby) ApplyBaby(baby);
         if (d.Gossip is { } g)
             Gossip(g, g.StartsWith("FLAGRA") || g.Contains("trai", StringComparison.OrdinalIgnoreCase) || g.Contains("termina") ? "escandalo" : "romance");
     }
 
-    /// <summary>Fim de temporada: relação sem cuidado esfria um pouco.</summary>
+    /// <summary>Gravidez, parto e adoção. Não há limite de filhos.</summary>
+    private void ApplyBaby(string baby)
+    {
+        var love = s.Love;
+        switch (baby)
+        {
+            case "esperando":
+                love.Expecting = true;
+                love.ExpectingWith = love.Partner;
+                love.Twins = Rand() < .06;
+                Milestone("🤰", love.Twins ? "{par} está grávida de gêmeos" : love.Children.Count == 0 ? "{par} está grávida do primeiro filho" : "{par} está grávida de novo");
+                break;
+            case "nasceu":
+            case "adotou":
+                var first = love.Children.Count == 0;
+                if (love.BabyName == null) NameBabies();
+                foreach (var name in new[] { love.BabyName, love.BabyName2 }.Where(n => n != null))
+                {
+                    love.Children.Add(new Child
+                    {
+                        Name = name!, Sex = GirlNames.Any(g => name!.StartsWith(g)) ? "f" : "m", BornAge = s.Age, BornSeason = s.Season,
+                        Mother = baby == "adotou" ? love.Partner : love.ExpectingWith ?? love.Partner, Adopted = baby == "adotou"
+                    });
+                }
+                Milestone(baby == "adotou" ? "🧸" : "👶", baby == "adotou" ? "Adotou {bebe}" : love.Twins ? "Nasceram os gêmeos {bebe}" : "Nasceu {bebe}");
+                love.Expecting = false;
+                love.Twins = false;
+                love.BabyName = love.BabyName2 = null;
+                s.SetFlag("pai");
+                if (first) s.Scheduled.Add(new ScheduledEvent { EventId = "v_filho_estadio", At = s.Day + 60 });
+                break;
+        }
+    }
+
+    /// <summary>Fim de temporada: relação sem cuidado esfria um pouco, e filho custa (escola, plano, babá).</summary>
     private void SeasonLove()
     {
         var love = s.Love;
+        if (love.Children.Count > 0)
+        {
+            s.Money = Math.Max(0, Round1(s.Money - .2 * love.Children.Count));
+            s.Family = Clamp(s.Family + Math.Min(6, 2 * love.Children.Count));
+        }
         if (!CommittedStages.Contains(love.Stage)) return;
         love.Affection = Clamp(love.Affection - (love.Stage == "casado" ? 4 : 6) + (s.Family >= 60 ? 3 : 0));
         if (love.Affection < 20 && !s.Scheduled.Any(x => x.EventId == "r_termino"))

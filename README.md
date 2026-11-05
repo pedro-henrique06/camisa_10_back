@@ -152,6 +152,10 @@ por acesso ou rebaixamento recente; para corrigir, edite a lista e regere:
   sai o **FLAGRA** nas revistas. Divórcio leva 30% do patrimônio. Revistas e sites de fofoca fictícios
   (`Gossip`) noticiam namoros, casamentos, compras de luxo e, principalmente, os escândalos; quem ainda não é
   famoso só aparece nos escândalos. Os antigos `n_nam` e `v_pedido` foram substituídos.
+  **Filhos sem limite** (`Love.Children`): com alguém (namorando, noivo ou casado), a cada temporada pode surgir
+  "Aumentar a família?": tentar (gravidez, 6% de gêmeos, e o parto uns 23 dias depois), adotar ou esperar.
+  No máximo um parto por temporada. Cada filho tem nome, mãe e idade, custa R$ 0,2 mi por temporada e aumenta
+  a família.
 - **Decisões de carreira e lances por posição** (`Events.Decisions.cs`): 15 decisões de carreira (banco de
   reservas, improvisação, técnico novo, concorrente contratado, renovação, coletiva polêmica, conversa vazada,
   cobrador de faltas, empréstimo, liderança, protesto da torcida, seleção com dor...). As que dependem do

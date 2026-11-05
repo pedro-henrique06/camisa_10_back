@@ -117,6 +117,8 @@ public class Fx
     public string? LoveStage { get; set; }
     /// <summary>Manchete das revistas de fofoca ({nome} = jogador, {par} = quem está com ele).</summary>
     public string? Gossip { get; set; }
+    /// <summary>Filhos: "esperando" (gravidez), "nasceu" (parto) ou "adotou".</summary>
+    public string? Baby { get; set; }
 
     public Fx Clone() => (Fx)MemberwiseClone();
 

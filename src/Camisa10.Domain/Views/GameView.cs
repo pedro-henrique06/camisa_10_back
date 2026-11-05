@@ -96,7 +96,10 @@ public record HudView(
 /// <param name="StageLabel">Ex.: "Namorando", "Casado".</param>
 /// <param name="Affection">0 a 100 (só faz sentido com alguém).</param>
 public record LoveView(string Stage, string StageLabel, string? Partner, string? PartnerJob, int Affection, int Years, int Cheats,
-    IReadOnlyList<LoveMilestoneView> Milestones);
+    IReadOnlyList<LoveMilestoneView> Milestones, bool Expecting = false, IReadOnlyList<ChildView>? Children = null);
+
+/// <param name="Age">Idade da criança (temporadas desde que chegou).</param>
+public record ChildView(string Name, string Sex, int Age, string? Mother, bool Adopted);
 
 public record LoveMilestoneView(int Age, string Icon, string Text);
 

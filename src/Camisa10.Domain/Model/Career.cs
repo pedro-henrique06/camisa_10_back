@@ -575,6 +575,28 @@ public class Romance
     public int Cheats { get; set; }
     /// <summary>A história: cada passo do relacionamento.</summary>
     public List<RomanceMilestone> Milestones { get; set; } = new();
+    /// <summary>Esperando um bebê (de quem, para o registro).</summary>
+    public bool Expecting { get; set; }
+    public string? ExpectingWith { get; set; }
+    /// <summary>Gêmeos a caminho.</summary>
+    public bool Twins { get; set; }
+    /// <summary>Nome do bebê que vai nascer (sorteado quando o evento do nascimento aparece).</summary>
+    public string? BabyName { get; set; }
+    public string? BabyName2 { get; set; }
+    /// <summary>Filhos do jogador. Não há limite: no máximo um parto por temporada.</summary>
+    public List<Child> Children { get; set; } = new();
+}
+
+public class Child
+{
+    public string Name { get; set; } = "";
+    /// <summary>m ou f.</summary>
+    public string Sex { get; set; } = "m";
+    /// <summary>Idade do jogador quando a criança chegou.</summary>
+    public int BornAge { get; set; }
+    public int BornSeason { get; set; }
+    public string? Mother { get; set; }
+    public bool Adopted { get; set; }
 }
 
 public class RomanceMilestone

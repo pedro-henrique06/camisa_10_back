@@ -300,7 +300,8 @@ public sealed partial class GameEngine
             var last = s.LastUsed(v.Id);
             if (last is { } d && d != 0)
             {
-                var cooldown = GameData.Rare.Contains(v.Id) ? 150
+                var cooldown = v.Id == "r_bebe_plano" ? 20
+                    : GameData.Rare.Contains(v.Id) ? 150
                     : IsPersonal(v.Id) ? 60
                     : GameData.Training.Contains(v.Id) ? 15
                     : GameData.Big.Contains(v.Id) ? 120 : 30;

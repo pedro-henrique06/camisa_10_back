@@ -29,6 +29,7 @@ public class Camisa10DbContext(DbContextOptions<Camisa10DbContext> options) : Db
         modelBuilder.Owned<PitchReply>();
         modelBuilder.Owned<Romance>();
         modelBuilder.Owned<RomanceMilestone>();
+        modelBuilder.Owned<Child>();
         modelBuilder.Owned<GossipItem>();
         modelBuilder.Owned<PickResult>();
         modelBuilder.Owned<DiceRoll>();

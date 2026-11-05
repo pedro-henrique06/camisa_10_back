@@ -133,6 +133,44 @@ public class RomanceTests(ITestOutputHelper output)
     }
 
     [Fact]
+    public void Filhos_sem_limite_no_maximo_um_parto_por_temporada()
+    {
+        var (c, e) = New(21);
+        c.Love.Stage = "casado";
+        c.Love.Partner = "Clara";
+        c.Love.Affection = 90;
+        var plan = Events.Every.First(x => x.Id == "r_bebe_plano");
+        for (var season = 4; season <= 10; season++)
+        {
+            c.Season = season;
+            c.Love.Affection = 90;
+            var tries = 0;
+            while (!c.Love.Expecting)
+            {
+                Assert.True(plan.Condition(c));
+                Assert.True(++tries < 30);
+                Choose(c, e, "r_bebe_plano", 0);
+            }
+            Assert.False(plan.Condition(c), "grávida não planeja outro");
+            Choose(c, e, "r_gravidez", 1);
+            Choose(c, e, "r_nasceu", 0);
+            Assert.False(c.Love.Expecting);
+            Assert.False(plan.Condition(c), "um parto por temporada");
+        }
+        c.Season = 11;
+        Choose(c, e, "r_bebe_plano", 1); // e ainda adotar mais um
+        output.WriteLine(string.Join(", ", c.Love.Children.Select(k => $"{k.Name}{(k.Adopted ? " (adotado)" : "")}")));
+        Assert.True(c.Love.Children.Count >= 8, "sete partos e uma adoção, sem limite");
+        Assert.Equal(c.Love.Children.Count, c.Love.Children.Select(k => k.Name).Distinct().Count());
+        Assert.All(c.Love.Children, k => Assert.Equal("Clara", k.Mother));
+        Assert.True(c.Has("pai"));
+        Assert.Contains(c.Love.Milestones, m => m.Icon == "👶" && !m.Text.Contains("{"));
+        Assert.Contains(c.Gossip, g => g.Headline.StartsWith("Nasceu!") || g.Headline.Contains("corre para o estádio"));
+        var view = ViewBuilder.Build(c).Hud.Love!;
+        Assert.Equal(c.Love.Children.Count, view.Children!.Count);
+    }
+
+    [Fact]
     public void Carreiras_completas_tem_vida_amorosa()
     {
         var married = 0;
@@ -142,7 +180,7 @@ public class RomanceTests(ITestOutputHelper output)
             var (c, _) = GameSimulationTests.PlayToEnd(seed, "Atacante");
             if (c.Love.Milestones.Count > 0) withRomance++;
             if (c.Love.Milestones.Any(m => m.Icon == "💒")) married++;
-            output.WriteLine($"carreira {seed}: {c.Love.Stage}, {c.Love.Milestones.Count} marcos, {c.Gossip.Count} fofocas, traições {c.Love.Cheats} · " +
+            output.WriteLine($"carreira {seed}: {c.Love.Stage}, {c.Love.Children.Count} filhos, {c.Love.Milestones.Count} marcos, {c.Gossip.Count} fofocas, traições {c.Love.Cheats} · " +
                 string.Join(" → ", c.Love.Milestones.Select(m => $"{m.Icon}{m.Age}")));
         }
         Assert.True(withRomance >= 8, "quase toda carreira tem alguma história de amor");

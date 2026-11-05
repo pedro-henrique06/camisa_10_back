@@ -81,7 +81,8 @@ public static class ViewBuilder
         };
         var with = l.Stage is "ficando" or "namorando" or "noivo" or "casado";
         return new LoveView(l.Stage, label, l.Partner, l.PartnerJob, with ? l.Affection : 0, with ? Math.Max(0, s.Season - l.Since) : 0, l.Cheats,
-            l.Milestones.Select(m => new LoveMilestoneView(m.Age, m.Icon, m.Text)).ToList());
+            l.Milestones.Select(m => new LoveMilestoneView(m.Age, m.Icon, m.Text)).ToList(), l.Expecting,
+            l.Children.Select(c => new ChildView(c.Name, c.Sex, Math.Max(0, s.Age - c.BornAge), c.Mother, c.Adopted)).ToList());
     }
 
     /// <summary>A casa do jogador: equipamentos para comprar e o efeito de cada um na idade atual.</summary>

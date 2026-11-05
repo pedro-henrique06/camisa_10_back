@@ -76,8 +76,8 @@ public static partial class Events
 
         // ---------------------------------------------------------------- noivo e casado
         Ev("r_casamento", "O casamento com {par}", "Chegou o grande dia, e a festa cai na semana de um jogo importante.", s => false,
-            O("Festa enorme com o elenco e famosos", "Inesquecível. O treino seguinte, nem tanto.", new Fx { LoveStage = "casado", Love = 12, Money = -3, Locker = 5, Fitness = -3, FollowUp = "v_bebe", FollowUpIn = 36, Gossip = "Casamento de {nome} e {par} reúne craques e famosos" }),
-            O("Cerimônia pequena, só a família", "Íntimo e emocionante.", new Fx { LoveStage = "casado", Love = 12, Family = 8, FollowUp = "v_bebe", FollowUpIn = 36, Gossip = "{nome} e {par} se casam em cerimônia discreta" }),
+            O("Festa enorme com o elenco e famosos", "Inesquecível. O treino seguinte, nem tanto.", new Fx { LoveStage = "casado", Love = 12, Money = -3, Locker = 5, Fitness = -3, Gossip = "Casamento de {nome} e {par} reúne craques e famosos" }),
+            O("Cerimônia pequena, só a família", "Íntimo e emocionante.", new Fx { LoveStage = "casado", Love = 12, Family = 8, Gossip = "{nome} e {par} se casam em cerimônia discreta" }),
             O("Adiar o casamento", "{par} chora a noite inteira.", new Fx { Love = -18, Morale = -4, FollowUp = "r_casamento", FollowUpIn = 30 })),
         Ev("r_crise", "Crise em casa", "Vocês andam brigando por qualquer coisa. {par} diz que se sente sozinha.", s => Stage(s, "casado") && Years(s) >= 1,
             O("Fazer terapia de casal", "Aos poucos, a conversa volta.", new Fx { Love = 12, Money = -1 }),
@@ -86,6 +86,20 @@ public static partial class Events
         Ev("r_bodas", "Aniversário de casamento", "Mais um ano ao lado de {par}.", s => Stage(s, "casado") && Years(s) >= 1,
             O("Preparar uma surpresa", "Jantar à luz de velas e uma música especial.", new Fx { Love = 10, Morale = 3, Gossip = "{nome} faz surpresa romântica para {par} no aniversário de casamento" }),
             O("Esquecer a data", "{par} não fala com você o dia inteiro.", new Fx { Love = -14 })),
+
+        // ---------------------------------------------------------------- filhos (sem limite, um por temporada)
+        Ev("r_bebe_plano", "Aumentar a família?", "Depois de um almoço cheio de crianças na casa de amigos, {par} pergunta se vocês não querem ter {mais}um bebê. Hoje vocês têm {filhos}.",
+            s => Committed(s) && s.Age >= 20 && !s.Love.Expecting && s.Love.Children.All(c => c.BornSeason < s.Season),
+            O("Vamos tentar!", "Vocês decidem que é a hora.", new Fx { Baby = "esperando", Love = 8, Morale = 3, FollowUp = "r_gravidez", FollowUpIn = 5 }, 0.75,
+                "Ainda não veio, mas vocês seguem tentando.", new Fx { Love = 4 }),
+            O("Adotar uma criança", "Depois de meses de processo, {bebe} chega em casa.", new Fx { Baby = "adotou", Love = 8, Family = 6, Morale = 6, Money = -1, Gossip = "Coração enorme: {nome} e {par} adotam {bebe}" }),
+            O("Agora não, o foco é a carreira", "{par} entende, mas o assunto volta.", new Fx { Love = -4 })),
+        Ev("r_gravidez", "Vem aí {mais}um bebê!", "O teste deu positivo: {mae} está grávida{gemeos}.", s => false,
+            O("Contar para a torcida no próximo gol", "A comemoração com a mão na barriga vira a foto do ano.", new Fx { Morale = 8, Fame = 3, Fans = 4, FollowUp = "r_nasceu", FollowUpIn = 18, Gossip = "{nome} comemora gol com a mão na barriga: vem aí {mais}um herdeiro!" }),
+            O("Guardar a notícia só para a família", "Um segredo bom de guardar.", new Fx { Morale = 7, Family = 6, FollowUp = "r_nasceu", FollowUpIn = 18 })),
+        Ev("r_nasceu", "{nasceu}", "{mae} entrou em trabalho de parto na madrugada antes de um jogo.", s => false,
+            O("Ficar no hospital e não jogar", "O clube libera. Nada é mais importante.", new Fx { Baby = "nasceu", Family = 12, Morale = 8, Trust = -2, Gossip = "Nasceu! {nome} e {mae} recebem {bebe}" }),
+            O("Ver o bebê e correr para o estádio", "Você joga com a cabeça no hospital.", new Fx { Baby = "nasceu", Family = 4, Morale = 5, Trust = 3, Fitness = -3, Gossip = "{nome} vê {bebe} nascer e corre para o estádio" })),
 
         // ---------------------------------------------------------------- tentações e escândalos
         Ev("r_tentacao", "Uma investida na concentração", "Uma fã conseguiu entrar no hotel e bate na porta do seu quarto, na véspera do jogo.", s => Committed(s),
