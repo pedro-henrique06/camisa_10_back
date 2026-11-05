@@ -113,8 +113,8 @@ public static partial class Events
             O("Dormir no quarto de hóspedes antes dos jogos", "O corpo agradece. A esposa, nem tanto.", new Fx { Fitness = 2, Family = -4 }),
             O("Contratar uma babá noturna", "Todo mundo dorme melhor.", new Fx { Money = -2, Fitness = 1, Family = 1 })),
         Ev("v_negocio", "Abrir um negócio", "Um amigo propõe abrir uma hamburgueria com o seu nome.", s => Prime(s) && s.Money >= 6 && !s.Has("negocio"),
-            O("Abrir a hamburgueria", "Fila na porta na inauguração.", new Fx { Money = 2, Fame = 2, Friends = 3, Flag = "negocio" }, 0.6, "Prejuízo nos primeiros meses e briga com o sócio.", new Fx { Money = -5, Friends = -6, Flag = "negocio" }),
-            O("Abrir uma escolinha de futebol", "Menos lucro, mais orgulho.", new Fx { Money = -2, Fans = 5, Morale = 4, Flag = "negocio" }),
+            O("Abrir a hamburgueria com ele (R$ 2 mi)", "Fila na porta na inauguração.", new Fx { Biz = "abrir:hamburgueria", Fame = 2, Friends = 3, Flag = "negocio" }),
+            O("Abrir uma escolinha de futebol (R$ 3 mi)", "Menos lucro, mais orgulho.", new Fx { Biz = "abrir:escolinha", Fans = 5, Morale = 4, Flag = "negocio" }),
             O("Não misturar amizade e dinheiro", "O amigo entende.", new Fx { })),
         Ev("v_instituto", "Um instituto no seu bairro", "A quadra onde você começou está abandonada. Dá para reformar e criar um projeto social.", s => Prime(s) && s.Fame >= 25 && !s.Has("instituto"),
             O("Criar o instituto", "Centenas de crianças com chuteira nova.", new Fx { Money = -4, Fans = 8, Fame = 4, Morale = 6, Flag = "instituto" }),
@@ -186,5 +186,5 @@ public static partial class Events
     private static IReadOnlyList<EventDef>? _every;
 
     /// <summary>Catálogo completo: os eventos originais e os de vida por idade.</summary>
-    public static IReadOnlyList<EventDef> Every => _every ??= All.Concat(Life).Concat(CareerMoves).Concat(Romance).ToList();
+    public static IReadOnlyList<EventDef> Every => _every ??= All.Concat(Life).Concat(CareerMoves).Concat(Romance).Concat(BusinessEvents).ToList();
 }

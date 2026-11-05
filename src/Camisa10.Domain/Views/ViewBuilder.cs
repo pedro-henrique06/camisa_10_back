@@ -69,7 +69,35 @@ public static class ViewBuilder
             Enumerable.Range(1, GameEngine.SeasonDays).Select(n => s.Competitions.FirstOrDefault(c => c.Days.Contains(n))?.Kind).ToList(),
             s.SeasonDay >= 1 ? SeasonCalendar.Label(SeasonCalendar.At(s.CalendarType, s.SeasonDay)) : null,
             engine.LeaguePosition(), s.LeagueTable.Count, TrophyRoom(s), Home(s), Love(s),
-            s.Gossip.AsEnumerable().Reverse().Take(15).Select(g => new GossipView(g.Age, g.Outlet, g.Headline, g.Kind)).ToList());
+            s.Gossip.AsEnumerable().Reverse().Take(15).Select(g => new GossipView(g.Age, g.Outlet, g.Headline, g.Kind)).ToList(),
+            BusinessOf(s, engine));
+    }
+
+    private static BusinessView BusinessOf(Career s, GameEngine engine)
+    {
+        var companies = s.Companies
+            .OrderBy(c => c.Status == "ativa" ? 0 : 1).ThenByDescending(c => c.Value)
+            .Select(c =>
+            {
+                var k = Business.Find(c.Kind)!;
+                return new CompanyView(c.Id, c.Kind, c.Name, k.Icon, k.Name, k.Unit, c.Level, Business.MaxLevel, c.Invested, c.Value, c.LastProfit,
+                    c.TotalProfit, c.Status, c.Manager, c.Status == "ativa" && c.Level < Business.MaxLevel ? Business.ExpandCost(k, c.Level) : null,
+                    c.Status == "ativa" ? Math.Floor(c.Value * .95 * 10 + .5) / 10 : c.SoldFor, c.OpenedAge,
+                    c.History.Select(h => new CompanyYearView(h.Age, h.Profit, h.Value, h.Level, h.Note)).ToList());
+            }).ToList();
+        var catalog = Business.Kinds.Select(k => new CompanyKindView(k.Id, k.Name, k.Icon, k.Description, k.Cost, Business.RiskLabel(k.Risk),
+            k.Id == "startup" ? "pode valer 10 vezes mais (ou quebrar)" : $"cerca de {Math.Round(k.Rate * 100)}% por temporada" + (k.Brand >= .5 ? ", mais se você for famoso" : ""),
+            s.Money >= k.Cost)).ToList();
+        var investments = Business.Assets.Select(a =>
+        {
+            var i = s.Investments.FirstOrDefault(x => x.Kind == a.Id);
+            return new InvestmentView(a.Id, a.Name, a.Icon, a.Description, Business.RiskLabel(a.Spread), $"cerca de {Math.Round(a.Mean * 100)}% por temporada",
+                i?.Principal ?? 0, i?.Value ?? 0, i?.LastReturn ?? 0,
+                i?.History.Select(h => new InvestmentYearView(h.Age, h.Value, h.Return)).ToList() ?? new List<InvestmentYearView>());
+        }).ToList();
+        var active = s.Companies.Where(c => c.Status == "ativa").ToList();
+        return new BusinessView(s.Money, engine.NetWorth(), Math.Round(active.Sum(c => c.LastProfit), 1),
+            Math.Round(s.Companies.Sum(c => c.TotalProfit), 1), companies, catalog, investments);
     }
 
     private static LoveView Love(Career s)

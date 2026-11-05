@@ -129,6 +129,21 @@ public sealed partial class GameEngine
             case ActionType.Buy:
                 Buy(action.ClubId ?? throw new GameRuleException("Escolha o equipamento."));
                 return;
+            case ActionType.OpenCompany:
+                OpenCompany(action.ClubId ?? throw new GameRuleException("Escolha o tipo de empresa."));
+                return;
+            case ActionType.ExpandCompany:
+                ExpandCompany(action.ClubId ?? throw new GameRuleException("Escolha a empresa."));
+                return;
+            case ActionType.SellCompany:
+                SellCompany(action.ClubId ?? throw new GameRuleException("Escolha a empresa."));
+                return;
+            case ActionType.Invest:
+                Invest(action.ClubId ?? throw new GameRuleException("Escolha o investimento."), action.Index ?? 0);
+                return;
+            case ActionType.Withdraw:
+                Withdraw(action.ClubId ?? throw new GameRuleException("Escolha o investimento."), action.Index);
+                return;
 
             case ActionType.Offer:
                 Pitch(action.ClubId ?? throw new GameRuleException("Escolha o clube."), action.Index ?? 1);
@@ -285,7 +300,7 @@ public sealed partial class GameEngine
     }
 
     /// <summary>Evento da vida fora de campo (os originais e os de cada fase da carreira).</summary>
-    private static bool IsPersonal(string id) => GameData.Personal.Contains(id) || Events.LifeIds.Contains(id) || Events.RomanceIds.Contains(id);
+    private static bool IsPersonal(string id) => GameData.Personal.Contains(id) || Events.LifeIds.Contains(id) || Events.RomanceIds.Contains(id) || Events.BusinessIds.Contains(id);
 
     /// <summary>
     /// Sorteia um evento do catálogo que respeite a condição e o tempo de recarga (pl). Os pessoais voltam
@@ -311,7 +326,7 @@ public sealed partial class GameEngine
         }).ToList();
         if (options.Count == 0) return null;
         double Weight(EventDef v) =>
-            (Events.LifeIds.Contains(v.Id) || Events.RomanceIds.Contains(v.Id) ? 3 : Events.CareerMoveIds.Contains(v.Id) ? 2 : 1) * (s.LastUsed(v.Id) == null ? 2 : 1) * (GameData.Rare.Contains(v.Id) ? .5 : 1);
+            (Events.LifeIds.Contains(v.Id) || Events.RomanceIds.Contains(v.Id) ? 3 : Events.CareerMoveIds.Contains(v.Id) || Events.BusinessIds.Contains(v.Id) ? 2 : 1) * (s.LastUsed(v.Id) == null ? 2 : 1) * (GameData.Rare.Contains(v.Id) ? .5 : 1);
         var total = options.Sum(Weight);
         var roll = Rand() * total;
         foreach (var v in options)
@@ -330,6 +345,7 @@ public sealed partial class GameEngine
     {
         BeforeMoment(ev);
         if (ev.EventId != null && Events.RomanceIds.Contains(ev.EventId)) FillRomance(ev);
+        if (ev.EventId != null && Events.BusinessIds.Contains(ev.EventId)) FillBusiness(ev);
         s.Current = ev;
         if (ev.EventId == "duel" && s.PendingDuel != null) { s.Phase = GamePhase.Duel; return; }
         if (ev.EventId != null) s.MarkUsed(ev.EventId);
@@ -494,6 +510,7 @@ public sealed partial class GameEngine
         if (d.End != null) s.EndReason = d.End;
         if (d.Promote is > 0 && s.Base) { Promote(); res.ClubChanged = true; }
         ApplyLove(d);
+        if (d.Biz != null) ApplyBiz(d.Biz);
         if (d.Flag != null) s.SetFlag(d.Flag);
         if (d.FollowUp != null) s.Scheduled.Add(new ScheduledEvent { EventId = d.FollowUp, At = s.Day + (d.FollowUpIn ?? 0) });
         if (d.Injury is { } ij && ij != 0) s.Injury = Math.Max(0, s.Injury + ij);
@@ -786,6 +803,7 @@ public sealed partial class GameEngine
             }
         }
         SeasonLove();
+        SeasonBusiness();
         s.Fans = Clamp(Round(s.Fans + (nota >= 7.5 ? 5 : nota < 6 ? -6 : 0) + (title ? 8 : 0) - (s.Fans - 50) / 4.0));
         s.Locker = Clamp(Round(s.Locker + (s.Trust - 50) / 10.0 - (s.Locker - 50) / 4.0));
         if (s.Fans < 30) s.Morale = Clamp(s.Morale - 5);
@@ -1243,7 +1261,17 @@ public enum ActionType
     /// <summary>No mercado: oferecer-se ao clube <see cref="GameAction.ClubId"/>, pedindo o salário <see cref="GameAction.Index"/> (0 menos, 1 normal, 2 mais).</summary>
     Offer,
     /// <summary>Comprar o equipamento (ou contratar o profissional) de id <see cref="GameAction.ClubId"/> para a casa.</summary>
-    Buy
+    Buy,
+    /// <summary>Abrir uma empresa do tipo <see cref="GameAction.ClubId"/> (ver <see cref="Business.Kinds"/>).</summary>
+    OpenCompany,
+    /// <summary>Abrir mais uma unidade da empresa de id <see cref="GameAction.ClubId"/>.</summary>
+    ExpandCompany,
+    /// <summary>Vender a empresa de id <see cref="GameAction.ClubId"/> pelo valor atual (menos 5% de taxas).</summary>
+    SellCompany,
+    /// <summary>Aplicar <see cref="GameAction.Index"/> décimos de milhão no investimento <see cref="GameAction.ClubId"/>.</summary>
+    Invest,
+    /// <summary>Resgatar <see cref="GameAction.Index"/> décimos de milhão (nulo = tudo) do investimento <see cref="GameAction.ClubId"/>.</summary>
+    Withdraw
 }
 
 /// <param name="Power">Força da barra no pênalti (0 a 100).</param>
