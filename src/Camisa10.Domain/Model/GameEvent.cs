@@ -111,6 +111,14 @@ public class Fx
     public int? Assists { get; set; }
     public int? TitleBonus { get; set; }
     public string? Train { get; set; }
+    /// <summary>Vida amorosa: muda o afeto de quem está com o jogador (−100 a +100).</summary>
+    public int? Love { get; set; }
+    /// <summary>Vida amorosa: novo estágio (ficando, namorando, noivo, casado, separado, solteiro).</summary>
+    public string? LoveStage { get; set; }
+    /// <summary>Manchete das revistas de fofoca ({nome} = jogador, {par} = quem está com ele).</summary>
+    public string? Gossip { get; set; }
+    /// <summary>Filhos: "esperando" (gravidez), "nasceu" (parto) ou "adotou".</summary>
+    public string? Baby { get; set; }
 
     public Fx Clone() => (Fx)MemberwiseClone();
 

@@ -86,7 +86,25 @@ public record HudView(
     /// <summary>Sala de troféus: títulos agrupados por competição.</summary>
     TrophyRoomView Trophies,
     /// <summary>Casa do jogador: equipamentos e profissionais para comprar.</summary>
-    HomeView? Home = null);
+    HomeView? Home = null,
+    /// <summary>Vida amorosa: estágio, quem está com o jogador e a linha do tempo.</summary>
+    LoveView? Love = null,
+    /// <summary>Notas das revistas e sites de fofoca, da mais nova para a mais antiga.</summary>
+    IReadOnlyList<GossipView>? Gossip = null);
+
+/// <param name="Stage">solteiro, ficando, namorando, noivo, casado ou separado.</param>
+/// <param name="StageLabel">Ex.: "Namorando", "Casado".</param>
+/// <param name="Affection">0 a 100 (só faz sentido com alguém).</param>
+public record LoveView(string Stage, string StageLabel, string? Partner, string? PartnerJob, int Affection, int Years, int Cheats,
+    IReadOnlyList<LoveMilestoneView> Milestones, bool Expecting = false, IReadOnlyList<ChildView>? Children = null);
+
+/// <param name="Age">Idade da criança (temporadas desde que chegou).</param>
+public record ChildView(string Name, string Sex, int Age, string? Mother, bool Adopted);
+
+public record LoveMilestoneView(int Age, string Icon, string Text);
+
+/// <param name="Kind">romance, escandalo ou luxo.</param>
+public record GossipView(int Age, string Outlet, string Headline, string Kind);
 
 /// <summary>Casa do jogador: o que dá para comprar e o que ele já tem.</summary>
 /// <param name="Upkeep">Custo por temporada dos profissionais contratados (R$ mi).</param>

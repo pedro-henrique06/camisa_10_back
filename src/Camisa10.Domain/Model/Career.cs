@@ -148,6 +148,10 @@ public class Career
     public List<string> Equipment { get; set; } = new();
     /// <summary>Concussões na carreira (a terceira pode encerrar a carreira).</summary>
     public int Concussions { get; set; }
+    /// <summary>Vida amorosa: estágio, com quem, o afeto e a história do relacionamento.</summary>
+    public Romance Love { get; set; } = new();
+    /// <summary>O que as revistas e sites de fofoca publicam sobre o jogador (as mais novas no fim).</summary>
+    public List<GossipItem> Gossip { get; set; } = new();
     public List<UsedEvent> Used { get; set; } = new();
     public List<ScheduledEvent> Scheduled { get; set; } = new();
     public List<string> Headlines { get; set; } = new();
@@ -553,4 +557,71 @@ public class SeasonReport
     public List<CompetitionResult> Cups { get; set; } = new();
     /// <summary>Jogos da temporada, na ordem.</summary>
     public List<MatchRecord> Matches { get; set; } = new();
+}
+
+/// <summary>Vida amorosa do jogador.</summary>
+public class Romance
+{
+    /// <summary>solteiro, ficando, namorando, noivo, casado ou separado.</summary>
+    public string Stage { get; set; } = "solteiro";
+    public string? Partner { get; set; }
+    /// <summary>Profissão de quem está com o jogador (ex.: "arquiteta").</summary>
+    public string? PartnerJob { get; set; }
+    /// <summary>Afeto da relação (0 a 100). Abaixo de 20, a relação acaba.</summary>
+    public int Affection { get; set; }
+    /// <summary>Temporada em que o estágio atual começou.</summary>
+    public int Since { get; set; }
+    /// <summary>Quantas vezes o jogador traiu (descoberto ou não).</summary>
+    public int Cheats { get; set; }
+    /// <summary>A história: cada passo do relacionamento.</summary>
+    public List<RomanceMilestone> Milestones { get; set; } = new();
+    /// <summary>Esperando um bebê (de quem, para o registro).</summary>
+    public bool Expecting { get; set; }
+    public string? ExpectingWith { get; set; }
+    /// <summary>Gêmeos a caminho.</summary>
+    public bool Twins { get; set; }
+    /// <summary>Adoção em andamento (falta escolher o nome).</summary>
+    public bool Adopting { get; set; }
+    /// <summary>Nome do último bebê (ou dos gêmeos), escolhido pelo jogador.</summary>
+    public string? BabyName { get; set; }
+    public string? BabyName2 { get; set; }
+    /// <summary>Sexo dos bebês do parto atual ("m", "f" ou dois, nos gêmeos).</summary>
+    public string BabySex { get; set; } = "";
+    /// <summary>Nomes oferecidos na escolha do nome (um por opção).</summary>
+    public List<string> NameOptions { get; set; } = new();
+    /// <summary>Filho de quem o evento atual fala.</summary>
+    public string? FocusChild { get; set; }
+    /// <summary>Filhos do jogador. Não há limite: no máximo um parto por temporada.</summary>
+    public List<Child> Children { get; set; } = new();
+}
+
+public class Child
+{
+    public string Name { get; set; } = "";
+    /// <summary>m ou f.</summary>
+    public string Sex { get; set; } = "m";
+    /// <summary>Idade do jogador quando a criança chegou.</summary>
+    public int BornAge { get; set; }
+    public int BornSeason { get; set; }
+    public string? Mother { get; set; }
+    public bool Adopted { get; set; }
+}
+
+public class RomanceMilestone
+{
+    public int Age { get; set; }
+    public int Season { get; set; }
+    public string Icon { get; set; } = "❤️";
+    public string Text { get; set; } = "";
+}
+
+/// <summary>Nota de revista ou site de fofoca.</summary>
+public class GossipItem
+{
+    public int Age { get; set; }
+    public int Season { get; set; }
+    public string Outlet { get; set; } = "";
+    public string Headline { get; set; } = "";
+    /// <summary>romance, escandalo ou vida.</summary>
+    public string Kind { get; set; } = "romance";
 }
