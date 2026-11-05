@@ -158,6 +158,16 @@ por acesso ou rebaixamento recente; para corrigir, edite a lista e regere:
   (menino ganha a opção Júnior; gêmeos vêm em pares). Cada filho tem nome, sexo, mãe e idade, custa R$ 0,2 mi por
   temporada e aumenta a família. Conforme crescem, trazem decisões: febre na véspera de clássico (0 a 8 anos),
   aniversário em dia de jogo (1 a 15), escola (4 a 7), quer ser jogador (6 a 13) e confusão na escola (13 a 18).
+- **Negócios e investimentos** (`Business.cs`, `GameEngine.Business.cs`, `Events.Business.cs`): o jogador abre
+  quantas empresas quiser (ação `OpenCompany`): hamburgueria, academia, escolinha de futebol, restaurante, marca de
+  roupas, posto, prédio para alugar e startup. Cada uma tem custo, lucro médio e risco; as de marca rendem mais com
+  fama, a escolinha dá torcida, a startup pode valer 10 vezes mais ou quebrar. `ExpandCompany` abre mais uma
+  unidade (até 5) e `SellCompany` vende pelo valor atual. No fim da temporada cada empresa apura lucro (ou
+  prejuízo) e valor, com histórico por temporada; abaixo de 12% do investido, ela vai à falência. Investimentos
+  (`Invest`/`Withdraw`, em décimos de milhão): renda fixa, fundos imobiliários, ações e cripto, cada um com o seu
+  risco. Decisões: abrir o primeiro negócio, sócio querendo 30%, crise (injetar, cortar ou fechar), proposta de
+  compra (1,6 vez o valor), franquia, gerente profissional, fiscalização, pirâmide financeira, queda da bolsa
+  (vender, segurar ou comprar mais) e cobertura à venda.
 - **Decisões de carreira e lances por posição** (`Events.Decisions.cs`): 15 decisões de carreira (banco de
   reservas, improvisação, técnico novo, concorrente contratado, renovação, coletiva polêmica, conversa vazada,
   cobrador de faltas, empréstimo, liderança, protesto da torcida, seleção com dor...). As que dependem do

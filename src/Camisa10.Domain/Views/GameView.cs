@@ -90,7 +90,31 @@ public record HudView(
     /// <summary>Vida amorosa: estágio, quem está com o jogador e a linha do tempo.</summary>
     LoveView? Love = null,
     /// <summary>Notas das revistas e sites de fofoca, da mais nova para a mais antiga.</summary>
-    IReadOnlyList<GossipView>? Gossip = null);
+    IReadOnlyList<GossipView>? Gossip = null,
+    /// <summary>Empresas e investimentos.</summary>
+    BusinessView? Business = null);
+
+/// <param name="NetWorth">Dinheiro + valor das empresas ativas + investimentos.</param>
+/// <param name="SeasonProfit">Lucro das empresas na última temporada.</param>
+public record BusinessView(double Money, double NetWorth, double SeasonProfit, double TotalProfit, IReadOnlyList<CompanyView> Companies,
+    IReadOnlyList<CompanyKindView> Catalog, IReadOnlyList<InvestmentView> Investments);
+
+/// <param name="Status">ativa, vendida, fechada ou falida.</param>
+/// <param name="ExpandCost">Custo da próxima unidade (nulo no máximo).</param>
+public record CompanyView(string Id, string Kind, string Name, string Icon, string KindName, string Unit, int Level, int MaxLevel, double Invested,
+    double Value, double LastProfit, double TotalProfit, string Status, bool Manager, double? ExpandCost, double SellPrice, int OpenedAge,
+    IReadOnlyList<CompanyYearView> History);
+
+public record CompanyYearView(int Age, double Profit, double Value, int Level, string? Note);
+
+/// <param name="Expected">Ex.: "15% por temporada".</param>
+public record CompanyKindView(string Id, string Name, string Icon, string Description, double Cost, string Risk, string Expected, bool Affordable);
+
+/// <param name="Expected">Ex.: "cerca de 10% por temporada".</param>
+public record InvestmentView(string Id, string Name, string Icon, string Description, string Risk, string Expected, double Principal, double Value,
+    double LastReturn, IReadOnlyList<InvestmentYearView> History);
+
+public record InvestmentYearView(int Age, double Value, double Return);
 
 /// <param name="Stage">solteiro, ficando, namorando, noivo, casado ou separado.</param>
 /// <param name="StageLabel">Ex.: "Namorando", "Casado".</param>

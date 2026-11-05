@@ -146,6 +146,12 @@ public class Career
     public List<string> Flags { get; set; } = new();
     /// <summary>Equipamentos e profissionais da casa do jogador (ids de <c>Equipment.All</c>).</summary>
     public List<string> Equipment { get; set; } = new();
+    /// <summary>Empresas do jogador (ativas e as que já vendeu ou fechou).</summary>
+    public List<Company> Companies { get; set; } = new();
+    /// <summary>Investimentos (renda fixa, ações, fundos imobiliários, cripto).</summary>
+    public List<Investment> Investments { get; set; } = new();
+    /// <summary>Empresa de que o evento atual fala.</summary>
+    public string? FocusCompany { get; set; }
     /// <summary>Concussões na carreira (a terceira pode encerrar a carreira).</summary>
     public int Concussions { get; set; }
     /// <summary>Vida amorosa: estágio, com quem, o afeto e a história do relacionamento.</summary>
