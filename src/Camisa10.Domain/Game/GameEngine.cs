@@ -234,7 +234,7 @@ public sealed partial class GameEngine
         if (s.Injury <= 0 && !s.Base && !s.Scheduled.Any(x => x.EventId is "rb1" or "vd") && Rand() < SeriousInjuryChance())
             queue.Insert(0, SeriousInjury());
         if (s.Fitness < 40 && s.Injury <= 0 && Rand() < (40 - s.Fitness) / 120.0 + .02) queue.Insert(0, MinorInjury());
-        if (career != null && Rand() < .3) queue.Add(career);
+        if (career != null && Rand() < .4) queue.Add(career);
 
         s.Queue = queue.Where(e => e != null).Select(e => e!).ToList();
 
@@ -306,7 +306,7 @@ public sealed partial class GameEngine
         }).ToList();
         if (options.Count == 0) return null;
         double Weight(EventDef v) =>
-            (Events.LifeIds.Contains(v.Id) ? 3 : 1) * (s.LastUsed(v.Id) == null ? 2 : 1) * (GameData.Rare.Contains(v.Id) ? .5 : 1);
+            (Events.LifeIds.Contains(v.Id) ? 3 : Events.CareerMoveIds.Contains(v.Id) ? 2 : 1) * (s.LastUsed(v.Id) == null ? 2 : 1) * (GameData.Rare.Contains(v.Id) ? .5 : 1);
         var total = options.Sum(Weight);
         var roll = Rand() * total;
         foreach (var v in options)
@@ -1161,8 +1161,19 @@ public sealed partial class GameEngine
         var main = defender
             ? new List<EventDef> { Events.Def, Events.Def2, Events.Def3 }.Concat(Events.MatchDefense).Concat(Events.ExtraDefense).ToList()
             : new List<EventDef> { Events.Atk, Events.Atk2, Events.Atk3, Events.Atk4 }.Concat(Events.MatchAttack).Concat(Events.ExtraAttack).ToList();
-        var first = Pick(main).ToEvent(true);
-        first.Focus = defender ? "defense" : "attack";
+        // lance da posição (o ponta na linha de fundo, o zagueiro no mano a mano...) na maior parte dos jogos
+        GameEvent first;
+        if (Events.MatchByPosition.TryGetValue(s.Position, out var mine) && Rand() < .65)
+        {
+            var pick = Pick(mine.ToList());
+            first = pick.ToEvent(true);
+            first.Focus = pick.Id.StartsWith("pd_") ? "defense" : pick.Id.StartsWith("pc_") ? "center" : "attack";
+        }
+        else
+        {
+            first = Pick(main).ToEvent(true);
+            first.Focus = defender ? "defense" : "attack";
+        }
         list.Add(first);
         if (Rand() < .5)
         {
@@ -1170,6 +1181,18 @@ public sealed partial class GameEngine
             var c = Pick(center).ToEvent(true);
             c.Focus = "center";
             list.Add(c);
+        }
+        // às vezes, um segundo lance da posição no mesmo jogo
+        if (Events.MatchByPosition.TryGetValue(s.Position, out var more) && Rand() < .4)
+        {
+            var rest = more.Where(e => e.Id != first.EventId).ToList();
+            if (rest.Count > 0)
+            {
+                var pick = Pick(rest);
+                var second = pick.ToEvent(true);
+                second.Focus = pick.Id.StartsWith("pd_") ? "defense" : pick.Id.StartsWith("pc_") ? "center" : "attack";
+                list.Add(second);
+            }
         }
         if (!defender && Rand() < .25)
             list.Add(new GameEvent { EventId = "pen", Title = "Pênalti!", Text = "O árbitro aponta a marca. A bola é sua. Onde bater?", IsPenalty = true, IsMatch = true, Focus = "penalty" });

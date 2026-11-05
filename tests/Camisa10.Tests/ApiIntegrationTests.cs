@@ -193,7 +193,7 @@ public class MesaIntegrationTests : IDisposable
     /// <summary>Joga um lado do duelo até ele acabar (as escolhas do outro lado vêm da outra chamada).</summary>
     private static async Task<bool> PlayDuel(HttpClient a, HttpClient b, string duelId)
     {
-        for (var i = 0; i < 40; i++)
+        for (var i = 0; i < 80; i++)
         {
             var progressed = false;
             foreach (var (http, pick) in new[] { (a, 0), (b, 2) })
@@ -204,6 +204,13 @@ public class MesaIntegrationTests : IDisposable
                 if (turn.GetProperty("myChoice").ValueKind == JsonValueKind.Null)
                 {
                     var r = await http.PostAsJsonAsync($"/api/duels/{duelId}/choose", new { index = (i + pick) % 3 });
+                    Assert.Equal(HttpStatusCode.OK, r.StatusCode);
+                    progressed = true;
+                }
+                else if (turn.GetProperty("stage").GetString() == "roll" && turn.GetProperty("myRoll").ValueKind == JsonValueKind.Null)
+                {
+                    // as duas jogadas escolhidas: cada um rola o próprio d20
+                    var r = await http.PostAsync($"/api/duels/{duelId}/roll", null);
                     Assert.Equal(HttpStatusCode.OK, r.StatusCode);
                     progressed = true;
                 }
@@ -267,7 +274,7 @@ public class MesaIntegrationTests : IDisposable
             if (res == null) waited++;
         }
 
-        Assert.True(leagueDuels.Count > 0, $"nenhum clássico; idades {string.Join(",", await Task.WhenAll(ids.Select(async (id, i) => (await Json_(await clients[i].GetAsync($"/api/careers/{id}"))).GetProperty("hud").GetProperty("age").GetInt32())))}");
+        Assert.True(leagueDuels.Count > 0, $"nenhum clássico; {string.Join(" | ", await Task.WhenAll(ids.Select(async (id, i) => { var h = (await Json_(await clients[i].GetAsync($"/api/careers/{id}"))).GetProperty("hud"); return $"{h.GetProperty("age").GetInt32()} anos, {h.GetProperty("club").GetString()}, {h.GetProperty("league")}"; })))}");
         Assert.True(waited > 0, "o calendário junto fez alguém esperar");
 
         // depois do clássico, as duas tabelas da liga são iguais (mesmo mundo e placares reais compartilhados)
@@ -386,6 +393,18 @@ public class MesaIntegrationTests : IDisposable
         Assert.Contains(mesa.GetProperty("feed").EnumerateArray(), f => f.GetProperty("text").GetString()!.StartsWith("Todos prontos"));
     }
 
+    /// <summary>
+    /// Escolha aleatória que não leva o jogador para outro clube: o clássico da mesa só acontece com
+    /// os dois na mesma liga (transferências tornavam o teste instável).
+    /// </summary>
+    private static int StayIndex(JsonElement options, Random rng)
+    {
+        var moves = new[] { "Aceitar a fortuna", "Sair de graça", "Aceitar o desafio", "outro clube", "procurar clube", "empréstimo" };
+        var safe = Enumerable.Range(0, options.GetArrayLength())
+            .Where(i => !moves.Any(m => options[i].GetProperty("label").GetString()!.Contains(m, StringComparison.OrdinalIgnoreCase))).ToList();
+        return safe.Count > 0 ? safe[rng.Next(safe.Count)] : rng.Next(options.GetArrayLength());
+    }
+
     private static async Task<JsonElement?> Act(HttpClient http, string id, JsonElement v, Random rng)
     {
         if (v.GetProperty("status").GetString() == "Finished") return null;
@@ -394,7 +413,7 @@ public class MesaIntegrationTests : IDisposable
         object action = phase switch
         {
             // o bot nunca escolhe parar a carreira (a última opção do veredito médico)
-            "Event" => new { type = "Choose", index = v.GetProperty("event").GetProperty("id").GetString() == "vd" ? 0 : rng.Next(v.GetProperty("event").GetProperty("options").GetArrayLength()), version },
+            "Event" => new { type = "Choose", index = v.GetProperty("event").GetProperty("id").GetString() == "vd" ? 0 : StayIndex(v.GetProperty("event").GetProperty("options"), rng), version },
             "Penalty" => new { type = "Choose", index = 3, version, power = 75 },
             "Market" => new { type = "Stay", version },
             "Swap" => new { type = "Choose", index = 1, version },

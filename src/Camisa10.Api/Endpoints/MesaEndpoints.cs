@@ -44,6 +44,7 @@ public static class MesaEndpoints
         duels.MapGet("/{id}", GetDuel).WithSummary("Duelo visto pelo jogador: placar, lance atual e opções.");
         duels.MapPost("/{id}/choose", Choose).WithSummary("Escolhe a jogada do lance atual (ataque ou defesa).");
         duels.MapPost("/{id}/auto", Auto).WithSummary("Decide pelo amigo que demorou demais no lance.");
+        duels.MapPost("/{id}/roll", Roll).WithSummary("Rola o d20 do jogador no lance atual (depois das duas escolhas).");
     }
 
     private static string Player(HttpContext http) => CareerEndpoints.Player(http);
@@ -237,6 +238,9 @@ public static class MesaEndpoints
 
     private static Task<Results<Ok<DuelView>, NotFound, ProblemHttpResult>> Choose(HttpContext http, string id, DuelChoiceRequest req, Camisa10DbContext db, CancellationToken ct) =>
         Play(http, id, db, ct, (engine, side) => engine.Choose(side, req.Index));
+
+    private static Task<Results<Ok<DuelView>, NotFound, ProblemHttpResult>> Roll(HttpContext http, string id, Camisa10DbContext db, CancellationToken ct) =>
+        Play(http, id, db, ct, (engine, side) => engine.Roll(side));
 
     private static Task<Results<Ok<DuelView>, NotFound, ProblemHttpResult>> Auto(HttpContext http, string id, Camisa10DbContext db, CancellationToken ct) =>
         Play(http, id, db, ct, (engine, side) => engine.AutoPick(side, DateTime.UtcNow));
