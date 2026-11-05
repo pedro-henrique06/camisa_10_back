@@ -134,6 +134,7 @@ public class StoryTests(ITestOutputHelper output)
         var tags = new HashSet<string>();
         var origins = new HashSet<string>();
         var arcs = new HashSet<string>();
+        var reps = Enumerable.Range(0, 6).Select(_ => new List<int>()).ToList();
         for (var seed = 1; seed <= 16; seed++)
         {
             var seen = new HashSet<string>();
@@ -149,6 +150,8 @@ public class StoryTests(ITestOutputHelper output)
             });
             sets.Add(seen);
             origins.Add(c.Origin!);
+            var r = c.Rep;
+            foreach (var (axis, v) in new[] { r.Character, r.Loyalty, r.Controversy, r.Charity, r.Ambition, r.Discipline }.Select((v, i) => (i, v))) reps[axis].Add(v);
             foreach (var l in c.Epilogue) epilogues.Add(l);
             foreach (var t in Story.Tags(c)) tags.Add(t.Label);
             foreach (var id in seen.Where(i => i.StartsWith("a_") || i.StartsWith("p_"))) arcs.Add(id);
@@ -165,7 +168,10 @@ public class StoryTests(ITestOutputHelper output)
         output.WriteLine($"parecença média entre duas carreiras: {sims.Average():P0}; origens {origins.Count}, rótulos {tags.Count}, frases de epílogo {epilogues.Count}, arcos e eventos de reputação vistos {arcs.Count}");
         Assert.True(sims.Average() < .4, "duas carreiras não podem ser quase iguais");
         Assert.True(origins.Count >= 6);
-        Assert.True(tags.Count >= 3, "reputações diferentes (o teste escolhe ao acaso, então os eixos tendem a se anular)");
+        // reputações diferentes: o teste escolhe ao acaso, então medimos se os eixos variam de uma carreira para outra
+        var spreads = reps.Select(axis => axis.Max() - axis.Min()).ToList();
+        output.WriteLine("variação de cada eixo entre as carreiras: " + string.Join(", ", spreads));
+        Assert.True(spreads.Count(x => x >= 5) >= 4, "a reputação muda de carreira para carreira");
         Assert.True(epilogues.Count >= 25, "finais diferentes");
         Assert.True(arcs.Count >= 20, "os arcos aparecem");
     }
