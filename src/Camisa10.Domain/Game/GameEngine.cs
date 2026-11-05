@@ -285,7 +285,7 @@ public sealed partial class GameEngine
     }
 
     /// <summary>Evento da vida fora de campo (os originais e os de cada fase da carreira).</summary>
-    private static bool IsPersonal(string id) => GameData.Personal.Contains(id) || Events.LifeIds.Contains(id);
+    private static bool IsPersonal(string id) => GameData.Personal.Contains(id) || Events.LifeIds.Contains(id) || Events.RomanceIds.Contains(id);
 
     /// <summary>
     /// Sorteia um evento do catálogo que respeite a condição e o tempo de recarga (pl). Os pessoais voltam
@@ -310,7 +310,7 @@ public sealed partial class GameEngine
         }).ToList();
         if (options.Count == 0) return null;
         double Weight(EventDef v) =>
-            (Events.LifeIds.Contains(v.Id) ? 3 : Events.CareerMoveIds.Contains(v.Id) ? 2 : 1) * (s.LastUsed(v.Id) == null ? 2 : 1) * (GameData.Rare.Contains(v.Id) ? .5 : 1);
+            (Events.LifeIds.Contains(v.Id) || Events.RomanceIds.Contains(v.Id) ? 3 : Events.CareerMoveIds.Contains(v.Id) ? 2 : 1) * (s.LastUsed(v.Id) == null ? 2 : 1) * (GameData.Rare.Contains(v.Id) ? .5 : 1);
         var total = options.Sum(Weight);
         var roll = Rand() * total;
         foreach (var v in options)
@@ -328,6 +328,7 @@ public sealed partial class GameEngine
     private void Show(GameEvent ev)
     {
         BeforeMoment(ev);
+        if (ev.EventId != null && Events.RomanceIds.Contains(ev.EventId)) FillRomance(ev);
         s.Current = ev;
         if (ev.EventId == "duel" && s.PendingDuel != null) { s.Phase = GamePhase.Duel; return; }
         if (ev.EventId != null) s.MarkUsed(ev.EventId);
@@ -491,6 +492,7 @@ public sealed partial class GameEngine
         if (d.Rehab is { } rq && rq != 0) s.Rehab = rq <= -90 ? 0 : s.Rehab + rq;
         if (d.End != null) s.EndReason = d.End;
         if (d.Promote is > 0 && s.Base) { Promote(); res.ClubChanged = true; }
+        ApplyLove(d);
         if (d.Flag != null) s.SetFlag(d.Flag);
         if (d.FollowUp != null) s.Scheduled.Add(new ScheduledEvent { EventId = d.FollowUp, At = s.Day + (d.FollowUpIn ?? 0) });
         if (d.Injury is { } ij && ij != 0) s.Injury = Math.Max(0, s.Injury + ij);
@@ -782,6 +784,7 @@ public sealed partial class GameEngine
                 s.Headlines.Add($"Sem dinheiro, {s.Name} dispensa o fisioterapeuta e o chef");
             }
         }
+        SeasonLove();
         s.Fans = Clamp(Round(s.Fans + (nota >= 7.5 ? 5 : nota < 6 ? -6 : 0) + (title ? 8 : 0) - (s.Fans - 50) / 4.0));
         s.Locker = Clamp(Round(s.Locker + (s.Trust - 50) / 10.0 - (s.Locker - 50) / 4.0));
         if (s.Fans < 30) s.Morale = Clamp(s.Morale - 5);

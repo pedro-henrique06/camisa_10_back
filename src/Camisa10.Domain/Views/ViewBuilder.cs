@@ -68,7 +68,20 @@ public static class ViewBuilder
             s.Status == CareerStatus.Active && engine.CanSearchClub(),
             Enumerable.Range(1, GameEngine.SeasonDays).Select(n => s.Competitions.FirstOrDefault(c => c.Days.Contains(n))?.Kind).ToList(),
             s.SeasonDay >= 1 ? SeasonCalendar.Label(SeasonCalendar.At(s.CalendarType, s.SeasonDay)) : null,
-            engine.LeaguePosition(), s.LeagueTable.Count, TrophyRoom(s), Home(s));
+            engine.LeaguePosition(), s.LeagueTable.Count, TrophyRoom(s), Home(s), Love(s),
+            s.Gossip.AsEnumerable().Reverse().Take(15).Select(g => new GossipView(g.Age, g.Outlet, g.Headline, g.Kind)).ToList());
+    }
+
+    private static LoveView Love(Career s)
+    {
+        var l = s.Love;
+        var label = l.Stage switch
+        {
+            "ficando" => "Ficando", "namorando" => "Namorando", "noivo" => "Noivo", "casado" => "Casado", "separado" => "Separado", _ => "Solteiro"
+        };
+        var with = l.Stage is "ficando" or "namorando" or "noivo" or "casado";
+        return new LoveView(l.Stage, label, l.Partner, l.PartnerJob, with ? l.Affection : 0, with ? Math.Max(0, s.Season - l.Since) : 0, l.Cheats,
+            l.Milestones.Select(m => new LoveMilestoneView(m.Age, m.Icon, m.Text)).ToList());
     }
 
     /// <summary>A casa do jogador: equipamentos para comprar e o efeito de cada um na idade atual.</summary>

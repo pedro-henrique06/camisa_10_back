@@ -143,6 +143,15 @@ por acesso ou rebaixamento recente; para corrigir, edite a lista e regere:
   fratura na perna), 8 leves, e três que podem encerrar a carreira conforme a escolha: hérnia de disco (cirurgia
   arriscada, conviver com a dor ou parar), concussão (a terceira faz os médicos recomendarem parar) e arritmia
   no coração (operar, parar ou esconder e continuar).
+- **Vida amorosa e fofoca** (`Events.Romance.cs`, `GameEngine.Romance.cs`): solteiro → ficando → namorando →
+  noivo → casado (ou separado). Cada estágio tem as suas decisões (primeiro encontro, pedir em namoro, conhecer a
+  família, ciúmes, distância, morar juntos, pedido de casamento, festa, crise, bodas) e mexe no afeto (0 a 100,
+  esfria um pouco a cada temporada); abaixo de 20, quem está com você pede para terminar. A progressão fica
+  registrada em `Love.Milestones` (conheceu, namoro, noivado, casamento, término, divórcio). Tentações (fã na
+  concentração, mensagem da ex) permitem trair: às vezes ninguém fica sabendo (e a culpa volta depois), às vezes
+  sai o **FLAGRA** nas revistas. Divórcio leva 30% do patrimônio. Revistas e sites de fofoca fictícios
+  (`Gossip`) noticiam namoros, casamentos, compras de luxo e, principalmente, os escândalos; quem ainda não é
+  famoso só aparece nos escândalos. Os antigos `n_nam` e `v_pedido` foram substituídos.
 - **Decisões de carreira e lances por posição** (`Events.Decisions.cs`): 15 decisões de carreira (banco de
   reservas, improvisação, técnico novo, concorrente contratado, renovação, coletiva polêmica, conversa vazada,
   cobrador de faltas, empréstimo, liderança, protesto da torcida, seleção com dor...). As que dependem do

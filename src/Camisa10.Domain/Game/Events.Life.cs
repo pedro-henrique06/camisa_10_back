@@ -35,7 +35,7 @@ public static partial class Events
             O("Ir e jogar de verdade", "Você joga solto e lembra por que ama futebol.", new Fx { Morale = 6, Friends = 6, Fitness = -2 }, 0.85, "Uma entrada mais dura e o tornozelo reclama.", new Fx { Fitness = -8, Trust = -2 }),
             O("Ir só para assistir", "Resenha garantida, sem risco.", new Fx { Friends = 4, Morale = 2 }),
             O("Recusar: o clube proíbe", "Os amigos acham que você mudou.", new Fx { Friends = -5, Trust = 1 })),
-        Ev("v_namoro1", "Primeiro namoro", "A menina da escola assiste ao jogo da base e espera você na saída.", s => Teen(s) && s.Age >= 16 && !s.Has("namoro1"),
+        Ev("v_namoro1", "Primeiro namoro", "A menina da escola assiste ao jogo da base e espera você na saída.", s => Teen(s) && s.Age >= 16 && !s.Has("namoro1") && s.Love.Stage == "solteiro",
             O("Chamar para tomar um sorvete", "Você fica vermelho, mas dá certo.", new Fx { Morale = 7, Flag = "namoro1" }),
             O("Fingir que não viu", "Vergonha falou mais alto.", new Fx { Morale = -2, Flag = "namoro1" })),
         Ev("v_onibus", "Duas horas de ônibus", "Do bairro ao CT são três conduções. O cansaço aparece no treino.", s => Teen(s) && s.Base,
@@ -95,7 +95,7 @@ public static partial class Events
             O("Recusar", "O clube agradece a seriedade.", new Fx { Trust = 3, Flag = "reality" })),
 
         // ---------------------------------------------------------------- auge (25 a 30)
-        Ev("v_pedido", "Hora de pedir em casamento?", "Vocês estão juntos há anos e a família já pergunta quando sai o casamento.", s => Prime(s) && !s.Has("casou"),
+        Ev("v_pedido", "Hora de pedir em casamento?", "Vocês estão juntos há anos e a família já pergunta quando sai o casamento.", s => false, // substituído pela vida amorosa (r_pedido)
             O("Pedir no gramado do estádio", "A torcida aplaude. A resposta é sim!", new Fx { Morale = 9, Fame = 3, Family = 6, Flag = "casou", FollowUp = "v_casamento", FollowUpIn = 12 }),
             O("Pedir num jantar a dois", "Simples e perfeito. Sim!", new Fx { Morale = 8, Family = 6, Flag = "casou", FollowUp = "v_casamento", FollowUpIn = 12 }),
             O("Esperar o fim da carreira", "Ela entende, mas fica pensativa.", new Fx { Morale = -2 })),
@@ -128,7 +128,7 @@ public static partial class Events
             O("Gravar o comercial", "Você vira meme nacional, no bom sentido.", new Fx { Money = 3, Fame = 5, Fitness = -1 }),
             O("Pedir para trocar por um refrigerante", "A marca topa. Sua imagem agradece.", new Fx { Money = 2, Fame = 3, Fans = 2 }),
             O("Recusar", "Você não quer associar o nome à bebida.", new Fx { Fans = 2, Trust = 1 })),
-        Ev("v_ferias_ilha", "Férias numa ilha", "Duas semanas de folga. A esposa quer praia, o preparador quer treino leve.", s => Prime(s) && !s.Base,
+        Ev("v_ferias_ilha", "Férias numa ilha", "Duas semanas de folga. A esposa quer praia, o preparador quer treino leve.", s => Prime(s) && !s.Base && s.Love.Stage == "casado",
             O("Praia e descanso total", "Você volta renovado, com dois quilos a mais.", new Fx { Morale = 8, Family = 5, Fitness = -3 }),
             O("Praia com personal trainer", "O equilíbrio perfeito.", new Fx { Morale = 5, Fitness = 3, Money = -2 }),
             O("Ficar treinando no CT", "O técnico adora. A família, não.", new Fx { Trust = 3, Family = -6 })),
@@ -186,5 +186,5 @@ public static partial class Events
     private static IReadOnlyList<EventDef>? _every;
 
     /// <summary>Catálogo completo: os eventos originais e os de vida por idade.</summary>
-    public static IReadOnlyList<EventDef> Every => _every ??= All.Concat(Life).Concat(CareerMoves).ToList();
+    public static IReadOnlyList<EventDef> Every => _every ??= All.Concat(Life).Concat(CareerMoves).Concat(Romance).ToList();
 }

@@ -477,7 +477,7 @@ public static partial class Events
             O("Drible e controle de bola", "Cones, fintas e domínio sob pressão.", new Fx { Train = "dri", Fitness = -1 }),
             O("Defesa e marcação", "Desarmes, cobertura e jogo aéreo.", new Fx { Train = "def", Fitness = -2 }),
             O("Descanso ativo e recuperação", "Você poupa o corpo e recarrega.", new Fx { Fitness = 6, Morale = 2 })),
-        Ev("n_nam", "Alguém especial", "Você conheceu alguém em um evento e a conversa não parou mais.", s => s.Age >= 18 && !s.Has("nam"),
+        Ev("n_nam", "Alguém especial", "Você conheceu alguém em um evento e a conversa não parou mais.", s => false, // substituído pela vida amorosa (r_conhece)
             O("Chamar para sair", "Vocês combinam um jantar discreto.", new Fx { Morale = 6, Flag = "nam", FollowUp = "n_nam2", FollowUpIn = 30 }, 0.6, "A resposta demora e você fica sem jeito.", new Fx { Morale = -3, Flag = "nam" }),
             O("Pedir o contato e esperar", "Sem pressa. A conversa continua por mensagem.", new Fx { Morale = 3, Flag = "nam", FollowUp = "n_nam2", FollowUpIn = 40 }),
             O("Deixar passar", "O foco é a carreira.", new Fx { Trust = 1, Flag = "nam" })),
