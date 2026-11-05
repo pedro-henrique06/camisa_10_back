@@ -154,11 +154,15 @@ public class RomanceTests(ITestOutputHelper output)
             Assert.False(plan.Condition(c), "grávida não planeja outro");
             Choose(c, e, "r_gravidez", 1);
             Choose(c, e, "r_nasceu", 0);
+            Assert.Contains(c.Scheduled, x => x.EventId == "r_nome");
+            c.Scheduled.Clear();
+            Choose(c, e, "r_nome", 0);
             Assert.False(c.Love.Expecting);
             Assert.False(plan.Condition(c), "um parto por temporada");
         }
         c.Season = 11;
         Choose(c, e, "r_bebe_plano", 1); // e ainda adotar mais um
+        Choose(c, e, "r_nome", 3);
         output.WriteLine(string.Join(", ", c.Love.Children.Select(k => $"{k.Name}{(k.Adopted ? " (adotado)" : "")}")));
         Assert.True(c.Love.Children.Count >= 8, "sete partos e uma adoção, sem limite");
         Assert.Equal(c.Love.Children.Count, c.Love.Children.Select(k => k.Name).Distinct().Count());
@@ -175,9 +179,29 @@ public class RomanceTests(ITestOutputHelper output)
     {
         var married = 0;
         var withRomance = 0;
+        var namings = 0;
+        var kidEvents = new HashSet<string>();
         for (var seed = 1; seed <= 10; seed++)
         {
-            var (c, _) = GameSimulationTests.PlayToEnd(seed, "Atacante");
+            GameEvent? last = null;
+            var (c, _) = GameSimulationTests.PlayToEnd(seed, "Atacante", "Flamengo", s =>
+            {
+                if (s.Phase != GamePhase.Event || s.Current == null || ReferenceEquals(s.Current, last)) return;
+                last = s.Current;
+                if (s.Current.EventId == "r_nome")
+                {
+                    namings++;
+                    var labels = s.Current.Options.Select(o => o.Label).ToList();
+                    Assert.Equal(4, labels.Distinct().Count());
+                    Assert.All(labels, l => Assert.DoesNotContain("{", l));
+                }
+                if (s.Current.EventId?.StartsWith("r_filho_") == true)
+                {
+                    kidEvents.Add(s.Current.EventId);
+                    Assert.DoesNotContain("{", s.Current.Title + s.Current.Text);
+                    Assert.Contains(s.Love.Children, k => (s.Current.Title + s.Current.Text).Contains(k.Name));
+                }
+            });
             if (c.Love.Milestones.Count > 0) withRomance++;
             if (c.Love.Milestones.Any(m => m.Icon == "💒")) married++;
             output.WriteLine($"carreira {seed}: {c.Love.Stage}, {c.Love.Children.Count} filhos, {c.Love.Milestones.Count} marcos, {c.Gossip.Count} fofocas, traições {c.Love.Cheats} · " +
@@ -185,5 +209,8 @@ public class RomanceTests(ITestOutputHelper output)
         }
         Assert.True(withRomance >= 8, "quase toda carreira tem alguma história de amor");
         Assert.True(married >= 2, "alguns jogadores chegam a casar");
+        output.WriteLine($"escolhas de nome: {namings}, eventos dos filhos: {string.Join(", ", kidEvents)}");
+        Assert.True(namings >= 5, "o jogador escolhe o nome dos filhos");
+        Assert.True(kidEvents.Count >= 3, "os filhos crescem e trazem decisões");
     }
 }

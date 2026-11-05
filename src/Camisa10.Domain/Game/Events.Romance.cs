@@ -89,17 +89,44 @@ public static partial class Events
 
         // ---------------------------------------------------------------- filhos (sem limite, um por temporada)
         Ev("r_bebe_plano", "Aumentar a família?", "Depois de um almoço cheio de crianças na casa de amigos, {par} pergunta se vocês não querem ter {mais}um bebê. Hoje vocês têm {filhos}.",
-            s => Committed(s) && s.Age >= 20 && !s.Love.Expecting && s.Love.Children.All(c => c.BornSeason < s.Season),
+            s => Committed(s) && s.Age >= 20 && !s.Love.Expecting && !s.Love.Adopting && s.Love.Children.All(c => c.BornSeason < s.Season),
             O("Vamos tentar!", "Vocês decidem que é a hora.", new Fx { Baby = "esperando", Love = 8, Morale = 3, FollowUp = "r_gravidez", FollowUpIn = 5 }, 0.75,
                 "Ainda não veio, mas vocês seguem tentando.", new Fx { Love = 4 }),
-            O("Adotar uma criança", "Depois de meses de processo, {bebe} chega em casa.", new Fx { Baby = "adotou", Love = 8, Family = 6, Morale = 6, Money = -1, Gossip = "Coração enorme: {nome} e {par} adotam {bebe}" }),
+            O("Adotar uma criança", "Depois de meses de processo, a criança chega em casa.", new Fx { Baby = "adotar", Love = 8, Family = 6, Morale = 6, Money = -1, FollowUp = "r_nome", FollowUpIn = 0 }),
             O("Agora não, o foco é a carreira", "{par} entende, mas o assunto volta.", new Fx { Love = -4 })),
         Ev("r_gravidez", "Vem aí {mais}um bebê!", "O teste deu positivo: {mae} está grávida{gemeos}.", s => false,
             O("Contar para a torcida no próximo gol", "A comemoração com a mão na barriga vira a foto do ano.", new Fx { Morale = 8, Fame = 3, Fans = 4, FollowUp = "r_nasceu", FollowUpIn = 18, Gossip = "{nome} comemora gol com a mão na barriga: vem aí {mais}um herdeiro!" }),
             O("Guardar a notícia só para a família", "Um segredo bom de guardar.", new Fx { Morale = 7, Family = 6, FollowUp = "r_nasceu", FollowUpIn = 18 })),
-        Ev("r_nasceu", "{nasceu}", "{mae} entrou em trabalho de parto na madrugada antes de um jogo.", s => false,
-            O("Ficar no hospital e não jogar", "O clube libera. Nada é mais importante.", new Fx { Baby = "nasceu", Family = 12, Morale = 8, Trust = -2, Gossip = "Nasceu! {nome} e {mae} recebem {bebe}" }),
-            O("Ver o bebê e correr para o estádio", "Você joga com a cabeça no hospital.", new Fx { Baby = "nasceu", Family = 4, Morale = 5, Trust = 3, Fitness = -3, Gossip = "{nome} vê {bebe} nascer e corre para o estádio" })),
+        Ev("r_nasceu", "Chegou a hora!", "{mae} entrou em trabalho de parto na madrugada antes de um jogo.", s => false,
+            O("Ficar no hospital e não jogar", "O clube libera. Nada é mais importante.", new Fx { Family = 12, Morale = 8, Trust = -2, FollowUp = "r_nome", FollowUpIn = 0 }),
+            O("Ver o bebê e correr para o estádio", "Você joga com a cabeça no hospital.", new Fx { Family = 4, Morale = 5, Trust = 3, Fitness = -3, FollowUp = "r_nome", FollowUpIn = 0 })),
+        Ev("r_nome", "Qual vai ser o nome?", "{sexo} Agora vocês precisam escolher o nome.", s => false,
+            O("{op0}", "Bem-vindo à família!", new Fx { Baby = "nome0", Morale = 3 }),
+            O("{op1}", "Bem-vindo à família!", new Fx { Baby = "nome1", Morale = 3 }),
+            O("{op2}", "Bem-vindo à família!", new Fx { Baby = "nome2", Morale = 3 }),
+            O("{op3}", "Bem-vindo à família!", new Fx { Baby = "nome3", Morale = 3 })),
+
+        // ---------------------------------------------------------------- os filhos crescendo
+        Ev("r_filho_doente", "{filho} está com febre alta", "É véspera de clássico e {filho} passou a tarde no pronto-socorro.", s => Kid(s, "r_filho_doente"),
+            O("Passar a noite no hospital", "{filho} melhora de manhã. Você joga sem dormir.", new Fx { Family = 8, Fitness = -4 }),
+            O("Deixar com a família e se concentrar", "Você joga bem, mas o coração ficou em casa.", new Fx { Family = -5, Trust = 2 })),
+        Ev("r_filho_aniv", "Aniversário de {filho}", "A festa de {filho} cai no mesmo dia de um jogo fora de casa.", s => Kid(s, "r_filho_aniv"),
+            O("Pedir liberação e ir à festa", "{filho} nunca vai esquecer o dia.", new Fx { Family = 8, Trust = -2 }),
+            O("Jogar e prometer um gol para {filho}", "Gol! Você corre para a câmera e faz a dedicatória.", new Fx { Family = 4, Fans = 3, Morale = 4 }, 0.5,
+                "Sem gol, e {filho} chora no telefone.", new Fx { Family = -4, Morale = -2 }),
+            O("Mandar um presente caro", "O presente é lindo, mas {filho} queria você lá.", new Fx { Money = -1, Family = 1 })),
+        Ev("r_filho_escola", "A escola de {filho}", "Chegou a hora de escolher a escola de {filho}.", s => Kid(s, "r_filho_escola"),
+            O("Escola particular bilíngue", "Cara, mas com estrutura de primeira.", new Fx { Money = -2, Family = 4 }),
+            O("A escola do bairro, perto de casa", "{filho} faz amigos de verdade e você leva todo dia que pode.", new Fx { Family = 5, Fans = 1 }),
+            O("Escola com time de futebol", "{filho} já sai de chuteira na mochila.", new Fx { Family = 3, Morale = 2 })),
+        Ev("r_filho_bola", "{filho} quer ser jogador", "{filho} não larga a bola e diz que quer jogar igual a você.", s => Kid(s, "r_filho_bola"),
+            O("Treinar junto no quintal", "As tardes mais felizes da semana.", new Fx { Family = 7, Morale = 4, Fitness = -1 }),
+            O("Colocar na escolinha da base do clube", "Os jornais adoram a história.", new Fx { Family = 3, Fame = 2, Gossip = "Filho de peixe: {filho} entra na escolinha e segue os passos de {nome}" }),
+            O("Pedir para focar nos estudos", "{filho} fica chateado, mas obedece.", new Fx { Family = -3 })),
+        Ev("r_filho_teen", "{filho} aprontou na escola", "A diretora ligou: {filho} se meteu numa confusão e pode ser suspenso.", s => Kid(s, "r_filho_teen"),
+            O("Conversar com calma", "Vocês conversam como nunca antes.", new Fx { Family = 6 }),
+            O("Castigo: sem celular por um mês", "{filho} fica bravo, mas a lição fica.", new Fx { Family = -2, Morale = 1 }),
+            O("Defender {filho} publicamente", "Vira notícia, e nem sempre boa.", new Fx { Family = 2, Fans = -2, Gossip = "{nome} sai em defesa de {filho} após confusão na escola" })),
 
         // ---------------------------------------------------------------- tentações e escândalos
         Ev("r_tentacao", "Uma investida na concentração", "Uma fã conseguiu entrar no hotel e bate na porta do seu quarto, na véspera do jogo.", s => Committed(s),
@@ -135,6 +162,15 @@ public static partial class Events
             O("Tentar reatar com {par}", "{par} aceita um café... e vocês voltam!", new Fx { LoveStage = "namorando", Love = 45, Morale = 6, Gossip = "Voltaram! {nome} e {par} reatam o namoro" }, 0.3,
                 "{par} já está com outra pessoa.", new Fx { LoveStage = "solteiro", Morale = -4 })),
     };
+
+    /// <summary>Faixa de idade dos filhos para cada evento (o evento escolhe um filho nessa faixa).</summary>
+    public static readonly Dictionary<string, (int Min, int Max)> KidAges = new()
+    {
+        ["r_filho_doente"] = (0, 8), ["r_filho_aniv"] = (1, 15), ["r_filho_escola"] = (4, 7), ["r_filho_bola"] = (6, 13), ["r_filho_teen"] = (13, 18),
+    };
+
+    private static bool Kid(Career s, string id) =>
+        KidAges[id] is var (min, max) && s.Love.Children.Any(c => s.Age - c.BornAge >= min && s.Age - c.BornAge <= max);
 
     public static readonly HashSet<string> RomanceIds = Romance.Select(e => e.Id).ToHashSet();
 }

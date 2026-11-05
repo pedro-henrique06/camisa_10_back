@@ -580,9 +580,17 @@ public class Romance
     public string? ExpectingWith { get; set; }
     /// <summary>Gêmeos a caminho.</summary>
     public bool Twins { get; set; }
-    /// <summary>Nome do bebê que vai nascer (sorteado quando o evento do nascimento aparece).</summary>
+    /// <summary>Adoção em andamento (falta escolher o nome).</summary>
+    public bool Adopting { get; set; }
+    /// <summary>Nome do último bebê (ou dos gêmeos), escolhido pelo jogador.</summary>
     public string? BabyName { get; set; }
     public string? BabyName2 { get; set; }
+    /// <summary>Sexo dos bebês do parto atual ("m", "f" ou dois, nos gêmeos).</summary>
+    public string BabySex { get; set; } = "";
+    /// <summary>Nomes oferecidos na escolha do nome (um por opção).</summary>
+    public List<string> NameOptions { get; set; } = new();
+    /// <summary>Filho de quem o evento atual fala.</summary>
+    public string? FocusChild { get; set; }
     /// <summary>Filhos do jogador. Não há limite: no máximo um parto por temporada.</summary>
     public List<Child> Children { get; set; } = new();
 }

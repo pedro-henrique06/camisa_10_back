@@ -46,7 +46,8 @@ public sealed partial class GameEngine
     private void FillRomance(GameEvent ev)
     {
         if (ev.EventId == "r_conhece") NewCandidate();
-        if (ev.EventId is "r_bebe_plano" or "r_nasceu") NameBabies();
+        if (ev.EventId == "r_nome") NameBabies();
+        if (ev.EventId!.StartsWith("r_filho_")) PickKid(ev.EventId);
         string F(string? t) => t == null ? "" : RomanceText(t);
         if (!(ev.Title + ev.Text).Contains('{') && !ev.Options.Any(o => (o.Label + o.SuccessText + o.FailText).Contains('{'))) return;
         ev.Title = F(ev.Title);
@@ -59,25 +60,43 @@ public sealed partial class GameEngine
         }
     }
 
-    /// <summary>Sorteia o nome do bebê (ou dos gêmeos), sem repetir o de um irmão.</summary>
+    /// <summary>Sexo dos bebês e quatro opções de nome (sem repetir irmãos). Menino sozinho ganha a opção Júnior.</summary>
     private void NameBabies()
     {
-        string Pick()
+        var love = s.Love;
+        love.BabySex = string.Concat(Enumerable.Range(0, love.Twins ? 2 : 1).Select(_ => R(0, 1) == 0 ? 'm' : 'f'));
+        var used = love.Children.Select(c => c.Name).ToHashSet();
+        List<string> Names(char sex)
         {
-            var pool = R(0, 1) == 0 ? BoyNames : GirlNames;
-            var free = pool.Where(n => s.Love.Children.All(c => c.Name != n) && n != s.Love.BabyName).ToList();
-            return free.Count > 0 ? free[R(0, free.Count - 1)] : pool[R(0, pool.Length - 1)] + " " + (s.Love.Children.Count + 1);
+            var pool = (sex == 'm' ? BoyNames : GirlNames).Where(n => !used.Contains(n)).OrderBy(_ => Rand()).ToList();
+            while (pool.Count < 4) pool.Add((sex == 'm' ? BoyNames : GirlNames)[R(0, BoyNames.Length - 1)] + " " + (love.Children.Count + pool.Count + 1));
+            return pool;
         }
-        s.Love.BabyName = Pick();
-        s.Love.BabyName2 = s.Love.Twins ? Pick() : null;
+        var a = Names(love.BabySex[0]);
+        var b = love.BabySex.Length > 1 ? Names(love.BabySex[1]).Where(n => !a.Take(4).Contains(n)).Concat(Names(love.BabySex[1])).ToList() : null;
+        love.NameOptions = Enumerable.Range(0, 4).Select(i => b != null ? $"{a[i]} e {b[i]}" : a[i]).ToList();
+        var junior = s.Name.Split(' ')[0] + " Júnior";
+        if (love.BabySex == "m" && !used.Contains(junior)) love.NameOptions[3] = junior;
+    }
+
+    /// <summary>Um filho na idade certa para o evento (aniversário, escola, futebol...).</summary>
+    private void PickKid(string eventId)
+    {
+        var (min, max) = Events.KidAges.GetValueOrDefault(eventId, (0, 99));
+        var kids = s.Love.Children.Where(c => s.Age - c.BornAge >= min && s.Age - c.BornAge <= max).ToList();
+        if (kids.Count > 0) s.Love.FocusChild = kids[R(0, kids.Count - 1)].Name;
     }
 
     private string Babies => s.Love.BabyName2 != null ? $"{s.Love.BabyName} e {s.Love.BabyName2}" : s.Love.BabyName ?? "o bebê";
 
+    private string Option(int i) => i < s.Love.NameOptions.Count ? s.Love.NameOptions[i] : "Escolher depois";
+
     private string RomanceText(string t) => t
         .Replace("{mae}", s.Love.ExpectingWith ?? s.Love.Partner ?? "a mãe")
         .Replace("{bebe}", Babies)
-        .Replace("{nasceu}", s.Love.Twins ? $"Nasceram os gêmeos {Babies}!" : $"Nasceu {Babies}!")
+        .Replace("{sexo}", s.Love.BabySex switch { "m" => "É um menino!", "f" => "É uma menina!", "mf" or "fm" => "São gêmeos: um menino e uma menina!", "mm" => "São gêmeos: dois meninos!", "ff" => "São gêmeas: duas meninas!", _ => "" })
+        .Replace("{op0}", Option(0)).Replace("{op1}", Option(1)).Replace("{op2}", Option(2)).Replace("{op3}", Option(3))
+        .Replace("{filho}", s.Love.FocusChild ?? "seu filho")
         .Replace("{gemeos}", s.Love.Twins ? " de gêmeos" : "")
         .Replace("{mais}", s.Love.Children.Count > 0 ? "mais " : "")
         .Replace("{filhos}", s.Love.Children.Count switch { 0 => "nenhum filho", 1 => "um filho", var n => $"{n} filhos" })
@@ -169,22 +188,30 @@ public sealed partial class GameEngine
                 love.Twins = Rand() < .06;
                 Milestone("🤰", love.Twins ? "{par} está grávida de gêmeos" : love.Children.Count == 0 ? "{par} está grávida do primeiro filho" : "{par} está grávida de novo");
                 break;
-            case "nasceu":
-            case "adotou":
+            case "adotar":
+                love.Adopting = true;
+                love.Twins = false;
+                break;
+            case { } pick when pick.StartsWith("nome"):
+                if (love.NameOptions.Count == 0) NameBabies();
+                var chosen = love.NameOptions[Math.Clamp(int.Parse(pick[4..]), 0, love.NameOptions.Count - 1)].Split(" e ");
+                var adopted = love.Adopting;
                 var first = love.Children.Count == 0;
-                if (love.BabyName == null) NameBabies();
-                foreach (var name in new[] { love.BabyName, love.BabyName2 }.Where(n => n != null))
+                love.BabyName = chosen[0];
+                love.BabyName2 = chosen.Length > 1 ? chosen[1] : null;
+                for (var i = 0; i < chosen.Length; i++)
                 {
                     love.Children.Add(new Child
                     {
-                        Name = name!, Sex = GirlNames.Any(g => name!.StartsWith(g)) ? "f" : "m", BornAge = s.Age, BornSeason = s.Season,
-                        Mother = baby == "adotou" ? love.Partner : love.ExpectingWith ?? love.Partner, Adopted = baby == "adotou"
+                        Name = chosen[i], Sex = i < love.BabySex.Length ? love.BabySex[i].ToString() : "m", BornAge = s.Age, BornSeason = s.Season,
+                        Mother = adopted ? love.Partner : love.ExpectingWith ?? love.Partner, Adopted = adopted
                     });
                 }
-                Milestone(baby == "adotou" ? "🧸" : "👶", baby == "adotou" ? "Adotou {bebe}" : love.Twins ? "Nasceram os gêmeos {bebe}" : "Nasceu {bebe}");
-                love.Expecting = false;
-                love.Twins = false;
-                love.BabyName = love.BabyName2 = null;
+                Milestone(adopted ? "🧸" : "👶", adopted ? "Adotou {bebe}" : chosen.Length > 1 ? "Nasceram os gêmeos {bebe}" : "Nasceu {bebe}");
+                Gossip(adopted ? "Coração enorme: {nome} e {par} adotam {bebe}"
+                    : chosen.Length > 1 ? "Gêmeos! {nome} e {mae} recebem {bebe}" : "Nasceu! {nome} e {mae} recebem {bebe}", "familia");
+                love.Expecting = love.Adopting = love.Twins = false;
+                love.NameOptions.Clear();
                 s.SetFlag("pai");
                 if (first) s.Scheduled.Add(new ScheduledEvent { EventId = "v_filho_estadio", At = s.Day + 60 });
                 break;

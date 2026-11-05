@@ -154,8 +154,10 @@ por acesso ou rebaixamento recente; para corrigir, edite a lista e regere:
   famoso só aparece nos escândalos. Os antigos `n_nam` e `v_pedido` foram substituídos.
   **Filhos sem limite** (`Love.Children`): com alguém (namorando, noivo ou casado), a cada temporada pode surgir
   "Aumentar a família?": tentar (gravidez, 6% de gêmeos, e o parto uns 23 dias depois), adotar ou esperar.
-  No máximo um parto por temporada. Cada filho tem nome, mãe e idade, custa R$ 0,2 mi por temporada e aumenta
-  a família.
+  No máximo um parto por temporada. No nascimento (ou na adoção) o jogador escolhe o nome entre quatro opções
+  (menino ganha a opção Júnior; gêmeos vêm em pares). Cada filho tem nome, sexo, mãe e idade, custa R$ 0,2 mi por
+  temporada e aumenta a família. Conforme crescem, trazem decisões: febre na véspera de clássico (0 a 8 anos),
+  aniversário em dia de jogo (1 a 15), escola (4 a 7), quer ser jogador (6 a 13) e confusão na escola (13 a 18).
 - **Decisões de carreira e lances por posição** (`Events.Decisions.cs`): 15 decisões de carreira (banco de
   reservas, improvisação, técnico novo, concorrente contratado, renovação, coletiva polêmica, conversa vazada,
   cobrador de faltas, empréstimo, liderança, protesto da torcida, seleção com dor...). As que dependem do
