@@ -100,7 +100,7 @@ public class ApiIntegrationTests : IDisposable
 
         var created = await http.PostAsJsonAsync("/api/careers", new { name = "X", club = "Flamengo", nation = "Brasil", position = "Meia" });
         var view = (await created.Content.ReadFromJsonAsync<GameView>(Json))!;
-        Assert.Equal("Calendar", view.Phase);
+        Assert.Equal("Event", view.Phase); // a carreira abre com a história da origem
         var wrong = await http.PostAsJsonAsync($"/api/careers/{view.Id}/actions", new { type = "Retire", version = view.Version });
         Assert.Equal(HttpStatusCode.BadRequest, wrong.StatusCode);
     }

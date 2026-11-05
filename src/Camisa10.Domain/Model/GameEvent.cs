@@ -121,6 +121,8 @@ public class Fx
     public string? Baby { get; set; }
     /// <summary>Negócios: "abrir:tipo" ou uma decisão sobre a empresa do evento (vender30, injetar, cortar, fechar, vender, franquia, gerente, multa, golpe, segurar, comprar_queda, vender_acoes).</summary>
     public string? Biz { get; set; }
+    /// <summary>Reputação: "carater:2,polemica:-1" (carater, lealdade, polemica, solidario, ambicao, disciplina).</summary>
+    public string? Rep { get; set; }
 
     public Fx Clone() => (Fx)MemberwiseClone();
 

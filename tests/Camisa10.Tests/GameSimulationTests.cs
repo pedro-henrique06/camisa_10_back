@@ -81,15 +81,25 @@ public class GameSimulationTests
     }
 
     [Fact]
-    public void Nova_carreira_comeca_no_calendario_da_base()
+    public void Nova_carreira_comeca_na_historia_da_origem_e_depois_no_calendario_da_base()
     {
         var c = GameEngine.NewCareer("p", "  Zico  ", "Flamengo", "Brasil", "Meia", new GameRandom(1));
         Assert.Equal("Zico", c.Name);
         Assert.Equal("Base do Flamengo", c.Club);
         Assert.True(c.Base);
+        Assert.Equal(GamePhase.Event, c.Phase);
+        Assert.Equal("o_" + c.Origin, c.Current!.EventId);
+        ToCalendar(c, new GameEngine(c, new GameRandom(1)));
         Assert.Equal(GamePhase.Calendar, c.Phase);
         Assert.Equal(1, c.Season);
         Assert.Equal(c.Overall, new GameEngine(c).Ovr());
+    }
+
+    /// <summary>Responde a origem (e os avisos do começo) até chegar ao calendário.</summary>
+    private static void ToCalendar(Career c, GameEngine e)
+    {
+        for (var i = 0; i < 10 && c.Phase != GamePhase.Calendar; i++)
+            e.Act(new GameAction(c.Phase == GamePhase.Event ? ActionType.Choose : ActionType.Continue, c.Phase == GamePhase.Event ? 0 : null));
     }
 
     [Fact]
@@ -97,6 +107,9 @@ public class GameSimulationTests
     {
         var c = GameEngine.NewCareer("p", "X", "Flamengo", "Brasil", "Meia", new GameRandom(1));
         var engine = new GameEngine(c, new GameRandom(2));
+        Assert.Throws<GameRuleException>(() => engine.Act(new GameAction(ActionType.Choose, 9))); // a origem tem no máximo 4 opções
+        ToCalendar(c, engine);
+        Assert.Equal(GamePhase.Calendar, c.Phase);
         Assert.Throws<GameRuleException>(() => engine.Act(new GameAction(ActionType.Retire)));
         Assert.Throws<GameRuleException>(() => engine.Act(new GameAction(ActionType.Choose, 0)));
         Assert.Throws<GameRuleException>(() => engine.Act(new GameAction(ActionType.SearchClub)));

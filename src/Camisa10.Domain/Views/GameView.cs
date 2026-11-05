@@ -92,7 +92,19 @@ public record HudView(
     /// <summary>Notas das revistas e sites de fofoca, da mais nova para a mais antiga.</summary>
     IReadOnlyList<GossipView>? Gossip = null,
     /// <summary>Empresas e investimentos.</summary>
-    BusinessView? Business = null);
+    BusinessView? Business = null,
+    /// <summary>A história do jogador: origem, reputação e (no fim) o epílogo.</summary>
+    StoryView? Story = null);
+
+/// <param name="Reputation">Eixos da reputação (−10 a +10 para o app desenhar).</param>
+public record StoryView(string? Origin, string? OriginName, string? OriginIcon, string? OriginText, IReadOnlyList<RepTagView> Tags,
+    IReadOnlyList<RepAxisView> Reputation, IReadOnlyList<string> Epilogue);
+
+public record RepTagView(string Icon, string Label, string Hint);
+
+/// <param name="Low">Nome do lado negativo (ex.: "Malandro").</param>
+/// <param name="High">Nome do lado positivo (ex.: "Honesto").</param>
+public record RepAxisView(string Key, string Low, string High, int Value);
 
 /// <param name="NetWorth">Dinheiro + valor das empresas ativas + investimentos.</param>
 /// <param name="SeasonProfit">Lucro das empresas na última temporada.</param>

@@ -72,7 +72,12 @@ public sealed partial class GameEngine
         c.Potential = engine.R(72, 94);
         c.Rival = GameData.Rivals[engine.R(0, 4)];
         c.Attributes = engine.MakeAttributes(position, 55);
+        // cada carreira começa com uma história diferente
+        var origin = Story.Origins[engine.R(0, Story.Origins.Count - 1)];
+        c.Origin = origin.Id;
+        origin.Setup(c);
         engine.StartSeason();
+        if (Catalog("o_" + origin.Id) is { } intro) engine.Show(intro.ToEvent()); // a primeira tela é a história da origem
         return c;
     }
 
@@ -300,7 +305,7 @@ public sealed partial class GameEngine
     }
 
     /// <summary>Evento da vida fora de campo (os originais e os de cada fase da carreira).</summary>
-    private static bool IsPersonal(string id) => GameData.Personal.Contains(id) || Events.LifeIds.Contains(id) || Events.RomanceIds.Contains(id) || Events.BusinessIds.Contains(id);
+    private static bool IsPersonal(string id) => GameData.Personal.Contains(id) || Events.LifeIds.Contains(id) || Events.RomanceIds.Contains(id) || Events.BusinessIds.Contains(id) || Events.StoryIds.Contains(id);
 
     /// <summary>
     /// Sorteia um evento do catálogo que respeite a condição e o tempo de recarga (pl). Os pessoais voltam
@@ -312,6 +317,7 @@ public sealed partial class GameEngine
         var options = Events.Every.Where(v =>
         {
             if (!filter(v.Id)) return false;
+            if (!Story.Fated(s, v.Id)) return false; // esta carreira não vive essa história
             var last = s.LastUsed(v.Id);
             if (last is { } d && d != 0)
             {
@@ -326,7 +332,7 @@ public sealed partial class GameEngine
         }).ToList();
         if (options.Count == 0) return null;
         double Weight(EventDef v) =>
-            (Events.LifeIds.Contains(v.Id) || Events.RomanceIds.Contains(v.Id) ? 3 : Events.CareerMoveIds.Contains(v.Id) || Events.BusinessIds.Contains(v.Id) ? 2 : 1) * (s.LastUsed(v.Id) == null ? 2 : 1) * (GameData.Rare.Contains(v.Id) ? .5 : 1);
+            (Events.LifeIds.Contains(v.Id) || Events.RomanceIds.Contains(v.Id) || Events.StoryIds.Contains(v.Id) ? 3 : Events.CareerMoveIds.Contains(v.Id) || Events.BusinessIds.Contains(v.Id) ? 2 : 1) * (s.LastUsed(v.Id) == null ? 2 : 1) * (GameData.Rare.Contains(v.Id) ? .5 : 1);
         var total = options.Sum(Weight);
         var roll = Rand() * total;
         foreach (var v in options)
@@ -346,6 +352,7 @@ public sealed partial class GameEngine
         BeforeMoment(ev);
         if (ev.EventId != null && Events.RomanceIds.Contains(ev.EventId)) FillRomance(ev);
         if (ev.EventId != null && Events.BusinessIds.Contains(ev.EventId)) FillBusiness(ev);
+        if (ev.EventId != null && Events.StoryIds.Contains(ev.EventId)) FillStory(ev);
         s.Current = ev;
         if (ev.EventId == "duel" && s.PendingDuel != null) { s.Phase = GamePhase.Duel; return; }
         if (ev.EventId != null) s.MarkUsed(ev.EventId);
@@ -511,6 +518,7 @@ public sealed partial class GameEngine
         if (d.Promote is > 0 && s.Base) { Promote(); res.ClubChanged = true; }
         ApplyLove(d);
         if (d.Biz != null) ApplyBiz(d.Biz);
+        if (d.Rep != null) Story.Apply(s.Rep, d.Rep);
         if (d.Flag != null) s.SetFlag(d.Flag);
         if (d.FollowUp != null) s.Scheduled.Add(new ScheduledEvent { EventId = d.FollowUp, At = s.Day + (d.FollowUpIn ?? 0) });
         if (d.Injury is { } ij && ij != 0) s.Injury = Math.Max(0, s.Injury + ij);
@@ -590,7 +598,7 @@ public sealed partial class GameEngine
         var t = s.Traits;
         if (pr < 1) t.Bold++;
         if (skillDelta > 0 || (d.Fitness ?? 0) > 0) t.Disciplined++;
-        if ((d.Morale ?? 0) >= 6 && ((d.Fitness ?? 0) < 0 || (d.Trust ?? 0) < 0)) t.Party++;
+        if ((d.Morale ?? 0) >= 6 && ((d.Fitness ?? 0) < 0 || (d.Trust ?? 0) < 0)) { t.Party++; if (t.Party % 2 == 0) s.Rep.Discipline--; }
         if ((d.Trust ?? 0) >= 4) t.Leader++;
     }
 
@@ -893,7 +901,8 @@ public sealed partial class GameEngine
         s.FinishedAt = DateTime.UtcNow;
         s.Current = null;
         s.Queue.Clear();
-        s.FinalTitle = s.EndReason == "les" ? "Carreira interrompida" : s.EndReason == "sau" ? "Escolheu a saúde" : LegacyTitle();
+        s.FinalTitle = s.EndReason switch { "les" => "Carreira interrompida", "sau" => "Escolheu a saúde", "ban" => "Banido do futebol", _ => LegacyTitle() };
+        s.Epilogue = Story.Epilogue(s, NetWorth());
     }
 
     public string LegacyTitle()
@@ -920,7 +929,9 @@ public sealed partial class GameEngine
             var fee = Round(MarketValue(t) * R(80, 130) / 100.0);
             if (fee < s.ReleaseClause * .5) continue;
             var bonus = mode == "ev" ? 1 : 1 + (s.Agent - 50) / 250.0;
-            var sl = Round(SalaryFor(t) * R(90, 125) / 100.0 * bonus * 10) / 10.0;
+            // reputação: clube grande evita polêmico; profissional e honesto ganha mais
+            if (t >= 4 && Story.BigClubsWary(s) && Rand() < .6) continue;
+            var sl = Round(SalaryFor(t) * R(90, 125) / 100.0 * bonus * Story.SalaryFactor(s) * 10) / 10.0;
             var lv = Round(fee * .05 * 10) / 10.0;
             offers.Add(new MarketOffer { ClubId = club.Id, Club = c, Tier = t, Fee = fee, Salary = sl, SigningBonus = lv });
         }
@@ -939,6 +950,7 @@ public sealed partial class GameEngine
     /// <summary>Assina com um clube (mk).</summary>
     private void Sign(int i)
     {
+        s.Rep.Loyalty--; // trocar de clube pesa na fama de fiel
         var x = s.MarketOffers[i];
         var country = CountryOfId(x.ClubId)?.Name ?? CountryOf(x.Club);
         s.Headlines.Add($"{s.Name} é anunciado pelo {x.Club} por R$ {Fmt.Num(x.Fee)} mi");
@@ -966,6 +978,7 @@ public sealed partial class GameEngine
     /// <summary>Fica no clube e pede aumento (stay).</summary>
     private void Stay()
     {
+        s.Rep.Loyalty++; // recusou propostas para ficar
         s.Current = new GameEvent
         {
             Title = "Aumento no clube",

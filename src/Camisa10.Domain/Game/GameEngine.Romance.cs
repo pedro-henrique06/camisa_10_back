@@ -91,7 +91,25 @@ public sealed partial class GameEngine
 
     private string Option(int i) => i < s.Love.NameOptions.Count ? s.Love.NameOptions[i] : "Escolher depois";
 
+    private static readonly string[] BuddyNames = { "Fabrício", "Juninho", "Wesley", "Neguinho", "Biel", "Kauã", "Dudu", "Tiquinho", "Matheus", "Rafinha" };
+
+    /// <summary>Histórias (origem, arcos, reputação): troca {amigo} e {nome}.</summary>
+    private void FillStory(GameEvent ev)
+    {
+        s.Buddy ??= BuddyNames[R(0, BuddyNames.Length - 1)];
+        string F(string? t) => t == null ? "" : RomanceText(t);
+        ev.Title = F(ev.Title);
+        ev.Text = F(ev.Text);
+        foreach (var o in ev.Options)
+        {
+            o.Label = F(o.Label);
+            o.SuccessText = F(o.SuccessText);
+            if (o.FailText != null) o.FailText = F(o.FailText);
+        }
+    }
+
     private string RomanceText(string t) => t
+        .Replace("{amigo}", s.Buddy ?? "seu amigo")
         .Replace("{mae}", s.Love.ExpectingWith ?? s.Love.Partner ?? "a mãe")
         .Replace("{bebe}", Babies)
         .Replace("{sexo}", s.Love.BabySex switch { "m" => "É um menino!", "f" => "É uma menina!", "mf" or "fm" => "São gêmeos: um menino e uma menina!", "mm" => "São gêmeos: dois meninos!", "ff" => "São gêmeas: duas meninas!", _ => "" })
@@ -173,7 +191,7 @@ public sealed partial class GameEngine
         }
         if (d.Baby is { } baby) ApplyBaby(baby);
         if (d.Gossip is { } g)
-            Gossip(g, g.StartsWith("FLAGRA") || g.Contains("trai", StringComparison.OrdinalIgnoreCase) || g.Contains("termina") ? "escandalo" : "romance");
+            Gossip(g, IsScandal(g) ? "escandalo" : "romance");
     }
 
     /// <summary>Gravidez, parto e adoção. Não há limite de filhos.</summary>
@@ -217,6 +235,9 @@ public sealed partial class GameEngine
                 break;
         }
     }
+
+    private static readonly string[] ScandalWords = { "FLAGRA", "BANIDO", "Doping", "trai", "termina", "flagrado", "preso", "Treta", "apostas", "multado", "pirâmide", "Racha", "piada", "cobrado", "debocha" };
+    private static bool IsScandal(string g) => ScandalWords.Any(w => g.Contains(w, StringComparison.OrdinalIgnoreCase));
 
     /// <summary>Fim de temporada: relação sem cuidado esfria um pouco, e filho custa (escola, plano, babá).</summary>
     private void SeasonLove()

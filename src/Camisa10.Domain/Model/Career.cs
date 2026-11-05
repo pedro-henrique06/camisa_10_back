@@ -152,6 +152,14 @@ public class Career
     public List<Investment> Investments { get; set; } = new();
     /// <summary>Empresa de que o evento atual fala.</summary>
     public string? FocusCompany { get; set; }
+    /// <summary>Origem sorteada no começo da carreira (ver <see cref="Game.Story"/>).</summary>
+    public string? Origin { get; set; }
+    /// <summary>Reputação formada pelas escolhas.</summary>
+    public Reputation Rep { get; set; } = new();
+    /// <summary>Como a história terminou (montado quando a carreira acaba).</summary>
+    public List<string> Epilogue { get; set; } = new();
+    /// <summary>Nome do amigo de infância (arco do amigo).</summary>
+    public string? Buddy { get; set; }
     /// <summary>Concussões na carreira (a terceira pode encerrar a carreira).</summary>
     public int Concussions { get; set; }
     /// <summary>Vida amorosa: estágio, com quem, o afeto e a história do relacionamento.</summary>
@@ -237,6 +245,26 @@ public class Attributes
     }
 
     public Attributes Clone() => new() { Rit = Rit, Chu = Chu, Pas = Pas, Dri = Dri, Def = Def, Fis = Fis };
+}
+
+/// <summary>
+/// Reputação do jogador: cada eixo começa em 0 e muda com as escolhas (negativo = o contrário). Libera e
+/// bloqueia eventos, muda as propostas dos clubes e define como a história termina.
+/// </summary>
+public class Reputation
+{
+    /// <summary>Honesto (+) ou malandro (−).</summary>
+    public int Character { get; set; }
+    /// <summary>Fiel ao clube e à torcida (+) ou mercenário (−).</summary>
+    public int Loyalty { get; set; }
+    /// <summary>Polêmico, briga em público (+) ou discreto (−).</summary>
+    public int Controversy { get; set; }
+    /// <summary>Solidário (+) ou egoísta (−).</summary>
+    public int Charity { get; set; }
+    /// <summary>Ambicioso, atrás de dinheiro e fama (+) ou tranquilo (−).</summary>
+    public int Ambition { get; set; }
+    /// <summary>Profissional exemplar (+) ou indisciplinado (−).</summary>
+    public int Discipline { get; set; }
 }
 
 public class Traits
